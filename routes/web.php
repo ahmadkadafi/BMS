@@ -14,7 +14,7 @@ use App\Http\Controllers\LineController;
 use App\Http\Controllers\TableController;
 
 
-Route::get('/', [DashboardController::class, 'dashboard']);
+Route::get('/', [DashboardController::class, 'dashboard'])->name('dashboard');
 Route::get('/about', [AboutController::class, 'about']);
 Route::get('/graphic', [GraphicController::class, 'graphic']);
 Route::get('/monitoring', [MonitoringController::class, 'monitoring']);
