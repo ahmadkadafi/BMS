@@ -39,7 +39,7 @@ class DashboardController extends Controller
                 'gardu.latitude',
                 'gardu.longitude',
                 'gardu.n_batt',
-                DB::raw('ROUND(AVG(lm.soh), 1) as avg_soh')
+                DB::raw('ROUND(AVG(lm.soh), 2) as avg_soh')
             )
             ->leftJoin('battery', 'battery.gardu_id', '=', 'gardu.id')
             ->leftJoinSub($latestMonitoring, 'lm', function ($join) {

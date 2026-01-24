@@ -16,14 +16,17 @@ use App\Http\Controllers\TableController;
 
 Route::get('/', [DashboardController::class, 'dashboard'])->name('dashboard');
 Route::get('/about', [AboutController::class, 'about']);
-Route::get('/graphic', [GraphicController::class, 'graphic']);
-Route::get('/monitoring', [MonitoringController::class, 'monitoring']);
+Route::get('/monitoring/resor/{resor}', [MonitoringController::class, 'index'])
+    ->name('monitoring.resor');
+Route::get('/graphic/resor/{resor}', [GraphicController::class, 'index'])
+    ->name('graphic.resor');
 Route::get('/batterysetting', [BatterySettingController::class, 'batterysetting']);
 Route::get('/logger', [LoggerController::class, 'logger']);
 Route::get('/analytic', [AnalyticController::class, 'analytic']);
 Route::get('/report', [ReportController::class, 'report']);
 Route::get('/test', [TestController::class, 'test']);
-Route::get('/line', [LineController::class, 'line']);
+Route::get('/line/resor/{resor}', [LineController::class, 'index'])
+    ->name('line.resor');
 Route::get('/table', [TableController::class, 'table']);
 
 

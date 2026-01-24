@@ -42,30 +42,22 @@
             </a>
             </li>
             <li class="nav-item">
-            <a data-bs-toggle="collapse" href="#monitoring">
-                <i class="fas fa-desktop"></i>
-                <p>Monitoring</p>
-                <span class="caret"></span>
-            </a>
-            <div class="collapse" id="monitoring">
-                <ul class="nav nav-collapse">
-                <li>
-                    <a href="/monitoring">
-                    <span class="sub-item">LAA Rangkas</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="components/buttons.html">
-                    <span class="sub-item">LAA Parungpanjang</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="components/gridsystem.html">
-                    <span class="sub-item">LAA Serpong</span>
-                    </a>
-                </li>
-                </ul>
-            </div>
+                <a data-bs-toggle="collapse" href="#monitoring">
+                    <i class="fas fa-desktop"></i>
+                    <p>Monitoring</p>
+                    <span class="caret"></span>
+                </a>
+                <div class="collapse" id="monitoring">
+                    <ul class="nav nav-collapse">
+                        @foreach ($resors as $resor)
+                            <li>
+                                <a href="{{ url('/monitoring/resor/'.$resor->id) }}">
+                                    <span class="sub-item">{{ $resor->nama }}</span>
+                                </a>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
             </li>
             <li class="nav-item">
                 <a data-bs-toggle="collapse" href="#graphic">
@@ -75,21 +67,13 @@
                 </a>
                 <div class="collapse" id="graphic">
                     <ul class="nav nav-collapse">
-                    <li>
-                        <a href="/graphic">
-                        <span class="sub-item">LAA Rangkas</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a href="icon-menu.html">
-                        <span class="sub-item">LAA Parungpanjang</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a href="icon-menu.html">
-                        <span class="sub-item">LAA Serpong</span>
-                        </a>
-                    </li>
+                        @foreach ($resors as $resor)
+                            <li>
+                                <a href="{{ url('/graphic/resor/'.$resor->id) }}">
+                                    <span class="sub-item">{{ $resor->nama }}</span>
+                                </a>
+                            </li>
+                        @endforeach
                     </ul>
                 </div>
             </li>
@@ -101,21 +85,13 @@
                 </a>
                 <div class="collapse" id="line">
                     <ul class="nav nav-collapse">
-                    <li>
-                        <a href="/line">
-                        <span class="sub-item">LAA Rangkas</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a href="icon-menu.html">
-                        <span class="sub-item">LAA Parungpanjang</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a href="icon-menu.html">
-                        <span class="sub-item">LAA Serpong</span>
-                        </a>
-                    </li>
+                        @foreach ($resors as $resor)
+                            <li>
+                                <a href="{{ url('/line/resor/'.$resor->id) }}">
+                                    <span class="sub-item">{{ $resor->nama }}</span>
+                                </a>
+                            </li>
+                        @endforeach
                     </ul>
                 </div>
             </li>
@@ -127,21 +103,13 @@
                 </a>
                 <div class="collapse" id="table">
                     <ul class="nav nav-collapse">
-                    <li>
-                        <a href="/table">
-                        <span class="sub-item">LAA Rangkas</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a href="icon-menu.html">
-                        <span class="sub-item">LAA Parungpanjang</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a href="icon-menu.html">
-                        <span class="sub-item">LAA Serpong</span>
-                        </a>
-                    </li>
+                        @foreach ($resors as $resor)
+                            <li>
+                                <a href="{{ url('/table/resor/'.$resor->id) }}">
+                                    <span class="sub-item">{{ $resor->nama }}</span>
+                                </a>
+                            </li>
+                        @endforeach
                     </ul>
                 </div>
             </li>
@@ -153,21 +121,13 @@
             </a>
             <div class="collapse" id="report">
                 <ul class="nav nav-collapse">
-                <li>
-                    <a href="/report">
-                    <span class="sub-item">LAA Rangkas</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="icon-menu.html">
-                    <span class="sub-item">LAA Parungpanjang</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="icon-menu.html">
-                    <span class="sub-item">LAA Serpong</span>
-                    </a>
-                </li>
+                    @foreach ($resors as $resor)
+                        <li>
+                            <a href="{{ url('/report/resor/'.$resor->id) }}">
+                                <span class="sub-item">{{ $resor->nama }}</span>
+                            </a>
+                        </li>
+                    @endforeach
                 </ul>
             </div>
             </li>
@@ -179,21 +139,13 @@
             </a>
             <div class="collapse" id="logger">
                 <ul class="nav nav-collapse">
-                <li>
-                    <a href="/logger">
-                    <span class="sub-item">LAA Rangkas</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="icon-menu.html">
-                    <span class="sub-item">LAA Parungpanjang</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="icon-menu.html">
-                    <span class="sub-item">LAA Serpong</span>
-                    </a>
-                </li>
+                    @foreach ($resors as $resor)
+                        <li>
+                            <a href="{{ url('/logger/resor/'.$resor->id) }}">
+                                <span class="sub-item">{{ $resor->nama }}</span>
+                            </a>
+                        </li>
+                    @endforeach
                 </ul>
             </div>
             </li>
@@ -205,21 +157,13 @@
             </a>
             <div class="collapse" id="batterysetting">
                 <ul class="nav nav-collapse">
-                <li>
-                    <a href="/batterysetting">
-                    <span class="sub-item">LAA Rangkas</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="icon-menu.html">
-                    <span class="sub-item">LAA Parungpanjang</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="icon-menu.html">
-                    <span class="sub-item">LAA Serpong</span>
-                    </a>
-                </li>
+                    @foreach ($resors as $resor)
+                        <li>
+                            <a href="{{ url('/batterysetting/resor/'.$resor->id) }}">
+                                <span class="sub-item">{{ $resor->nama }}</span>
+                            </a>
+                        </li>
+                    @endforeach
                 </ul>
             </div>
             </li>

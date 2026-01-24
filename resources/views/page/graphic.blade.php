@@ -1,255 +1,218 @@
 @extends('layouts.master')
-@section('title')
-    Graphic
-@endsection
+
+@section('title', 'Graphic - '.$resor->nama)
+
 @section('content')
-@include('partials.location')
-<div class="row">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-            <div class="card-title">Battery Voltage</div>
-            </div>
-            <div class="card-body">
-            <div class="chart-container">
-                <canvas id="BattVoltChart"></canvas>
-            </div>
-            </div>
+<div class="page-inner">
+
+    {{-- FILTER GARDU --}}
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET">
+                <div class="row align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Pilih Lokasi Gardu</label>
+                        <select name="gardu_id" class="form-select" onchange="this.form.submit()">
+                            <option value="">-- Semua Gardu --</option>
+                            @foreach ($gardu as $g)
+                                <option value="{{ $g->id }}"
+                                    {{ request('gardu_id') == $g->id ? 'selected' : '' }}>
+                                    {{ $g->nama }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+            </form>
         </div>
     </div>
-    <div class="col-md-6">
-        <div class="card">
+
+    {{-- FILTER DATA --}}
+    @php
+        $filteredGardu = request('gardu_id')
+            ? $gardu->where('id', request('gardu_id'))
+            : $gardu;
+    @endphp
+
+    @foreach ($filteredGardu as $g)
+        @php
+            $labels = [];
+            $volt = [];
+            $temp = [];
+            $thd  = [];
+            $soc  = [];
+            $soh  = [];
+
+            foreach ($g->batteries as $i => $b) {
+                $last = $b->monitorings
+                    ->sortByDesc('measured_at')
+                    ->first();
+
+                $labels[] = 'Battery '.($i+1);
+                $volt[] = $last->volt ?? 0;
+                $temp[] = $last->temp ?? 0;
+                $thd[]  = $last->thd ?? 0;
+                $soc[]  = $last->soc ?? 0;
+                $soh[]  = $last->soh ?? 0;
+            }
+        @endphp
+
+        <div class="card mb-5">
             <div class="card-header">
-            <div class="card-title">Battery Temperature</div>
+                <h5 class="card-title mb-0">
+                    {{ $g->nama }}
+                    <small class="text-muted">({{ count($labels) }} Battery)</small>
+                </h5>
             </div>
+
             <div class="card-body">
-            <div class="chart-container">
-                <canvas id="BattTempChart"></canvas>
-            </div>
+                <div class="row g-4">
+
+                    {{-- VOLT --}}
+                    <div class="col-lg-6">
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <i class="fas fa-battery-three-quarters text-success"></i>
+                                Voltage Battery (V)
+                            </div>
+                            <div class="chart-box">
+                                <canvas id="voltChart{{ $g->id }}"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- TEMP --}}
+                    <div class="col-lg-6">
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <i class="fas fa-thermometer-half text-danger"></i>
+                                Temperature (°C)
+                            </div>
+                            <div class="chart-box">
+                                <canvas id="tempChart{{ $g->id }}"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- THD --}}
+                    <div class="col-lg-6">
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <i class="fas fa-wave-square text-info"></i>
+                                THD (%)
+                            </div>
+                            <div class="chart-box">
+                                <canvas id="thdChart{{ $g->id }}"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- SOC --}}
+                    <div class="col-lg-6">
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <i class="fas fa-percent text-primary"></i>
+                                SOC (%)
+                            </div>
+                            <div class="chart-box">
+                                <canvas id="socChart{{ $g->id }}"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- SOH --}}
+                    <div class="col-lg-12">
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <i class="fas fa-heartbeat text-warning"></i>
+                                SOH (%)
+                            </div>
+                            <div class="chart-box">
+                                <canvas id="sohChart{{ $g->id }}"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
             </div>
         </div>
-    </div>
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-            <div class="card-title">Battery Internal Resistance</div>
-            </div>
-            <div class="card-body">
-            <div class="chart-container">
-                <canvas id="b"></canvas>
-            </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-            <div class="card-title">Battery State of Healt</div>
-            </div>
-            <div class="card-body">
-            <div class="chart-container">
-                <canvas id="c"></canvas>
-            </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-            <div class="card-title">Voltage Charging</div>
-            </div>
-            <div class="card-body">
-            <div class="chart-container">
-                <canvas id="d"></canvas>
-            </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-            <div class="card-title">Current Charging</div>
-            </div>
-            <div class="card-body">
-            <div class="chart-container">
-                <canvas id="CurrentChart"></canvas>
-            </div>
-            </div>
-        </div>
-    </div>
+
+        {{-- DATA KE JS --}}
+        <script>
+            const labels{{ $g->id }} = @json($labels);
+            const volt{{ $g->id }} = @json($volt);
+            const temp{{ $g->id }} = @json($temp);
+            const thd{{ $g->id }}  = @json($thd);
+            const soc{{ $g->id }}  = @json($soc);
+            const soh{{ $g->id }}  = @json($soh);
+        </script>
+    @endforeach
+
 </div>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-  var ctx1 = document.getElementById('BattVoltChart');
-  new Chart(ctx1, {
-    type: "bar",
-    data: {
-        labels: [
-        "Jan",
-        "Feb",
-        "Mar",
-        "Apr",
-        "May",
-        "Jun",
-        "Jul",
-        "Aug",
-        "Sep",
-        "Oct",
-        "Nov",
-        "Dec",
-        ],
-        datasets: [
-        {
-            label: "Batt 1",
-            borderColor: "#1d7af3",
-            pointBorderColor: "#FFF",
-            pointBackgroundColor: "#1d7af3",
-            pointBorderWidth: 2,
-            pointHoverRadius: 4,
-            pointHoverBorderWidth: 1,
-            pointRadius: 4,
-            backgroundColor: "transparent",
-            fill: true,
-            borderWidth: 2,
-            data: [30],
-        },
-        {
-            label: "Batt 2",
-            borderColor: "#59d05d",
-            pointBorderColor: "#FFF",
-            pointBackgroundColor: "#59d05d",
-            pointBorderWidth: 2,
-            pointHoverRadius: 4,
-            pointHoverBorderWidth: 1,
-            pointRadius: 4,
-            backgroundColor: "transparent",
-            fill: true,
-            borderWidth: 2,
-            data: [10],
-        },
-        {
-            label: "Batt 2",
-            borderColor: "#f3545d",
-            pointBorderColor: "#FFF",
-            pointBackgroundColor: "#f3545d",
-            pointBorderWidth: 2,
-            pointHoverRadius: 4,
-            pointHoverBorderWidth: 1,
-            pointRadius: 4,
-            backgroundColor: "transparent",
-            fill: true,
-            borderWidth: 2,
-            data: [58 ],
-        },
-        ],
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        legend: {
-        position: "top",
-        },
-        tooltips: {
-        bodySpacing: 4,
-        mode: "nearest",
-        intersect: 0,
-        position: "nearest",
-        xPadding: 10,
-        yPadding: 10,
-        caretPadding: 10,
-        },
-        layout: {
-        padding: { left: 15, right: 15, top: 15, bottom: 15 },
-        },
-    },
-  });
-</script>
-
-<script>
-  var ctx2 = document.getElementById('BattTempChart');
-  new Chart(ctx2, {
-    type: "bar",
-    data: {
-        labels: [
-        "Jan",
-        "Feb",
-        "Mar",
-        "Apr",
-        "May",
-        "Jun",
-        "Jul",
-        "Aug",
-        "Sep",
-        "Oct",
-        "Nov",
-        "Dec",
-        ],
-        datasets: [
-        {
-            label: "Batt 1",
-            borderColor: "#1d7af3",
-            pointBorderColor: "#FFF",
-            pointBackgroundColor: "#1d7af3",
-            pointBorderWidth: 2,
-            pointHoverRadius: 4,
-            pointHoverBorderWidth: 1,
-            pointRadius: 4,
-            backgroundColor: "transparent",
-            fill: true,
-            borderWidth: 2,
-            data: [30, 45, 45, 68, 69, 90, 100, 158, 177, 200, 245, 256],
-        },
-        {
-            label: "Batt 2",
-            borderColor: "#59d05d",
-            pointBorderColor: "#FFF",
-            pointBackgroundColor: "#59d05d",
-            pointBorderWidth: 2,
-            pointHoverRadius: 4,
-            pointHoverBorderWidth: 1,
-            pointRadius: 4,
-            backgroundColor: "transparent",
-            fill: true,
-            borderWidth: 2,
-            data: [10, 20, 55, 75, 80, 48, 59, 55, 23, 107, 60, 87],
-        },
-        {
-            label: "Batt 3",
-            borderColor: "#f3545d",
-            pointBorderColor: "#FFF",
-            pointBackgroundColor: "#f3545d",
-            pointBorderWidth: 2,
-            pointHoverRadius: 4,
-            pointHoverBorderWidth: 1,
-            pointRadius: 4,
-            backgroundColor: "transparent",
-            fill: true,
-            borderWidth: 2,
-            data: [10, 30, 58, 79, 90, 105, 117, 160, 185, 210, 185, 194],
-        },
-        ],
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        legend: {
-        position: "top",
-        },
-        tooltips: {
-        bodySpacing: 4,
-        mode: "nearest",
-        intersect: 0,
-        position: "nearest",
-        xPadding: 10,
-        yPadding: 10,
-        caretPadding: 10,
-        },
-        layout: {
-        padding: { left: 15, right: 15, top: 15, bottom: 15 },
-        },
-    },
-  });
-</script>
 @endsection
 
+@section('adding')
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+.chart-card {
+    border: 1px solid #e9ecef;
+    border-radius: 10px;
+    padding: 15px;
+    background: #fff;
+}
+
+.chart-header {
+    font-weight: 600;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.chart-box {
+    height: 240px;
+}
+</style>
+
+<script>
+function barChart(id, labels, data, color) {
+    new Chart(document.getElementById(id), {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                backgroundColor: color,
+                borderRadius: 6,
+                maxBarThickness: 40
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                x: {
+                    ticks: { font: { size: 11 } }
+                },
+                y: {
+                    beginAtZero: true,
+                    ticks: { font: { size: 11 } }
+                }
+            }
+        }
+    });
+}
+
+@foreach ($filteredGardu as $g)
+barChart('voltChart{{ $g->id }}', labels{{ $g->id }}, volt{{ $g->id }}, '#28a745');
+barChart('tempChart{{ $g->id }}', labels{{ $g->id }}, temp{{ $g->id }}, '#dc3545');
+barChart('thdChart{{ $g->id }}',  labels{{ $g->id }}, thd{{ $g->id }},  '#17a2b8');
+barChart('socChart{{ $g->id }}',  labels{{ $g->id }}, soc{{ $g->id }},  '#007bff');
+barChart('sohChart{{ $g->id }}',  labels{{ $g->id }}, soh{{ $g->id }},  '#ffc107');
+@endforeach
+</script>
+@endsection
