@@ -23,4 +23,9 @@ class Gardu extends Model
     {
         return $this->hasMany(Battery::class);
     }
+
+    public function resor()
+    {
+        return $this->belongsTo(Resor::class);
+    }
 }

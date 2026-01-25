@@ -27,6 +27,7 @@ Route::get('/report', [ReportController::class, 'report']);
 Route::get('/test', [TestController::class, 'test']);
 Route::get('/line/resor/{resor}', [LineController::class, 'index'])
     ->name('line.resor');
-Route::get('/table', [TableController::class, 'table']);
+Route::get('/table/resor/{resor}', [TableController::class, 'index'])
+    ->name('table.resor');
 
 

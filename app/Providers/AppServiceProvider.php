@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\Resor;
 use Illuminate\Support\Facades\View;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -25,5 +26,7 @@ class AppServiceProvider extends ServiceProvider
             $resors = Resor::orderBy('nama')->get();
             $view->with('resors', $resors);
         });
+        
+        Paginator::useBootstrapFive();
     }
 }
