@@ -20,7 +20,6 @@ Route::get('/monitoring/resor/{resor}', [MonitoringController::class, 'index'])
     ->name('monitoring.resor');
 Route::get('/graphic/resor/{resor}', [GraphicController::class, 'index'])
     ->name('graphic.resor');
-Route::get('/batterysetting', [BatterySettingController::class, 'batterysetting']);
 Route::get('/logger', [LoggerController::class, 'logger']);
 Route::get('/analytic', [AnalyticController::class, 'analytic']);
 Route::get('/report', [ReportController::class, 'report']);
@@ -29,5 +28,14 @@ Route::get('/line/resor/{resor}', [LineController::class, 'index'])
     ->name('line.resor');
 Route::get('/table/resor/{resor}', [TableController::class, 'index'])
     ->name('table.resor');
-
-
+Route::prefix('batterysetting')->group(function () {
+    Route::get('/resor/{resor}', 
+        [BatterySettingController::class, 'index']
+    )->name('batterysetting.index');
+    Route::post('/store', 
+        [BatterySettingController::class, 'store']
+    )->name('batterysetting.store');
+    Route::delete('/delete/{gardu}', 
+        [BatterySettingController::class, 'destroy']
+    )->name('batterysetting.destroy');
+});

@@ -6,31 +6,48 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('battery_setting', function (Blueprint $table) {
             $table->id();
-            $table->decimal('v_max',6,2);
-            $table->decimal('v_min',6,2);
-            $table->decimal('t_max',6,2);
-            $table->decimal('t_min',6,2);
-            $table->decimal('rint_max',6,2);
-            $table->decimal('soc_min',6,2);
-            $table->decimal('soh_min',6,2);
-            $table->foreignId('battery_id')->constrained('battery')->onDelete('cascade');
+
+            // ================= VOLTAGE =================
+            $table->decimal('volt_min_warn', 6, 2)->nullable();
+            $table->decimal('volt_min_alarm', 6, 2)->nullable();
+            $table->decimal('volt_max_warn', 6, 2)->nullable();
+            $table->decimal('volt_max_alarm', 6, 2)->nullable();
+
+            // ================= TEMPERATURE =================
+            $table->decimal('temp_min_warn', 6, 2)->nullable();
+            $table->decimal('temp_min_alarm', 6, 2)->nullable();
+            $table->decimal('temp_max_warn', 6, 2)->nullable();
+            $table->decimal('temp_max_alarm', 6, 2)->nullable();
+
+            // ================= THD =================
+            $table->decimal('thd_warn', 6, 2)->nullable();
+            $table->decimal('thd_alarm', 6, 2)->nullable();
+
+            // ================= SOC =================
+            $table->decimal('soc_warn', 6, 2)->nullable();
+            $table->decimal('soc_alarm', 6, 2)->nullable();
+
+            // ================= SOH =================
+            $table->decimal('soh_warn', 6, 2)->nullable();
+            $table->decimal('soh_alarm', 6, 2)->nullable();
+
+            // ================= RELATION =================
+            $table->foreignId('gardu_id')
+                ->constrained('gardu')
+                ->cascadeOnDelete();
+
             $table->timestamps();
-            $table->index('battery_id');
+
+            $table->index('gardu_id');
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        Schema::dropIfExists('battery_setting');
+        Schema::dropIfExists('battery_settings');
     }
 };
