@@ -29,17 +29,16 @@
         <div class="sidebar-content">
         <ul class="nav nav-secondary">
             <li class="nav-item">
-            <a
-                data-bs-toggle="collapse"
-                href="#dashboard"
-                class="collapsed"
-                aria-expanded="false"
-            >
                 <a href="/">
                     <i class="fas fa-home"></i>
                     <p>Dashboard</p>
                 </a>
-            </a>
+            </li>
+            <li class="nav-item">
+                <a href="/">
+                    <i class="fas fa-brain"></i>
+                    <p>AI Prediction</p>
+                </a>
             </li>
             <li class="nav-item">
                 <a data-bs-toggle="collapse" href="#monitoring">
