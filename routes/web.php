@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ResorDashboardController;
 use App\Http\Controllers\AboutController;
 use App\Http\Controllers\GraphicController;
 use App\Http\Controllers\MonitoringController;
@@ -19,7 +20,18 @@ use App\Http\Controllers\InputController;
 
 Route::get('/', function () {
     if (session()->has('auth_user')) {
-        return redirect()->route('dashboard');
+        $authUser = session('auth_user', []);
+        if (($authUser['role'] ?? null) === 'admin') {
+            return redirect()->route('dashboard');
+        }
+        if (isset($authUser['allowed_resor_id'])) {
+            return redirect()->route('dashboard.resor', ['resor' => $authUser['allowed_resor_id']]);
+        }
+        $firstResorId = \App\Models\Resor::query()->orderBy('id')->value('id');
+        if ($firstResorId) {
+            return redirect()->route('dashboard.resor', ['resor' => $firstResorId]);
+        }
+        return redirect()->route('login');
     }
 
     return redirect()->route('login');
@@ -34,8 +46,12 @@ Route::post('/logout', [LoginController::class, 'logout'])
     ->middleware('auth.session')
     ->name('logout');
 
-Route::middleware(['auth.session', 'resor.access'])->group(function () {
+Route::middleware(['auth.session', 'admin.only'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'dashboard'])->name('dashboard');
+});
+
+Route::middleware(['auth.session', 'resor.access'])->group(function () {
+    Route::get('/dashboard/resor/{resor}', [ResorDashboardController::class, 'index'])->name('dashboard.resor');
     Route::get('/about', [AboutController::class, 'about']);
     Route::get('/monitoring/resor/{resor}', [MonitoringController::class, 'index'])
         ->name('monitoring.resor');

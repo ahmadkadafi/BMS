@@ -43,23 +43,48 @@ class ReportController extends Controller
             $batteryIds = $gardu->batteries->pluck('id');
             $chargerIds = $gardu->chargers->pluck('id');
 
-            $batteryStats = $batteryIds->isEmpty()
-                ? null
-                : BatteryMonitoring::query()
-                    ->whereIn('battery_id', $batteryIds)
-                    ->whereYear('measured_at', $year)
-                    ->whereMonth('measured_at', $month)
-                    ->selectRaw('MAX(temp) as max_temp, MIN(temp) as min_temp, MAX(volt) as max_volt_cell, MIN(volt) as min_volt_cell, MAX(thd) as max_thd, MIN(thd) as min_thd')
-                    ->first();
+            $batteryBase = BatteryMonitoring::query()
+                ->whereIn('battery_id', $batteryIds)
+                ->whereYear('measured_at', $year)
+                ->whereMonth('measured_at', $month);
 
-            $chargerStats = $chargerIds->isEmpty()
-                ? null
-                : ChargerMonitoring::query()
-                    ->whereIn('charger_id', $chargerIds)
-                    ->whereYear('measured_at', $year)
-                    ->whereMonth('measured_at', $month)
-                    ->selectRaw('MAX(voltage) as max_voltage_charge, MIN(voltage) as min_voltage_charge, MAX(current) as max_current_charge, MIN(current) as min_current_charge')
-                    ->first();
+            $chargerBase = ChargerMonitoring::query()
+                ->whereIn('charger_id', $chargerIds)
+                ->whereYear('measured_at', $year)
+                ->whereMonth('measured_at', $month);
+
+            $pickExtreme = function ($baseQuery, string $field, string $direction) {
+                $row = (clone $baseQuery)
+                    ->whereNotNull($field)
+                    ->orderBy($field, $direction)
+                    ->orderBy('measured_at', $direction)
+                    ->first([$field, 'measured_at']);
+
+                if (! $row) {
+                    return ['value' => null, 'at' => null];
+                }
+
+                return [
+                    'value' => $row->{$field},
+                    'at' => $row->measured_at,
+                ];
+            };
+
+            $minTemp = $batteryIds->isEmpty() ? ['value' => null, 'at' => null] : $pickExtreme($batteryBase, 'temp', 'asc');
+            $maxTemp = $batteryIds->isEmpty() ? ['value' => null, 'at' => null] : $pickExtreme($batteryBase, 'temp', 'desc');
+            $minVoltCell = $batteryIds->isEmpty() ? ['value' => null, 'at' => null] : $pickExtreme($batteryBase, 'volt', 'asc');
+            $maxVoltCell = $batteryIds->isEmpty() ? ['value' => null, 'at' => null] : $pickExtreme($batteryBase, 'volt', 'desc');
+            $minThd = $batteryIds->isEmpty() ? ['value' => null, 'at' => null] : $pickExtreme($batteryBase, 'thd', 'asc');
+            $maxThd = $batteryIds->isEmpty() ? ['value' => null, 'at' => null] : $pickExtreme($batteryBase, 'thd', 'desc');
+            $minSoc = $batteryIds->isEmpty() ? ['value' => null, 'at' => null] : $pickExtreme($batteryBase, 'soc', 'asc');
+            $maxSoc = $batteryIds->isEmpty() ? ['value' => null, 'at' => null] : $pickExtreme($batteryBase, 'soc', 'desc');
+            $minSoh = $batteryIds->isEmpty() ? ['value' => null, 'at' => null] : $pickExtreme($batteryBase, 'soh', 'asc');
+            $maxSoh = $batteryIds->isEmpty() ? ['value' => null, 'at' => null] : $pickExtreme($batteryBase, 'soh', 'desc');
+
+            $minVoltCharge = $chargerIds->isEmpty() ? ['value' => null, 'at' => null] : $pickExtreme($chargerBase, 'voltage', 'asc');
+            $maxVoltCharge = $chargerIds->isEmpty() ? ['value' => null, 'at' => null] : $pickExtreme($chargerBase, 'voltage', 'desc');
+            $minCurrentCharge = $chargerIds->isEmpty() ? ['value' => null, 'at' => null] : $pickExtreme($chargerBase, 'current', 'asc');
+            $maxCurrentCharge = $chargerIds->isEmpty() ? ['value' => null, 'at' => null] : $pickExtreme($chargerBase, 'current', 'desc');
 
             $alertCounts = Logger::query()
                 ->where('gardu_id', $gardu->id)
@@ -82,16 +107,34 @@ class ReportController extends Controller
                 'remaining_days' => $remainingDays,
                 'warning_count' => (int) ($alertCounts->warning_count ?? 0),
                 'alarm_count' => (int) ($alertCounts->alarm_count ?? 0),
-                'max_temp' => $batteryStats?->max_temp,
-                'min_temp' => $batteryStats?->min_temp,
-                'max_volt_cell' => $batteryStats?->max_volt_cell,
-                'min_volt_cell' => $batteryStats?->min_volt_cell,
-                'max_thd' => $batteryStats?->max_thd,
-                'min_thd' => $batteryStats?->min_thd,
-                'max_voltage_charge' => $chargerStats?->max_voltage_charge,
-                'min_voltage_charge' => $chargerStats?->min_voltage_charge,
-                'max_current_charge' => $chargerStats?->max_current_charge,
-                'min_current_charge' => $chargerStats?->min_current_charge,
+                'max_temp' => $maxTemp['value'],
+                'min_temp' => $minTemp['value'],
+                'max_temp_at' => $maxTemp['at'],
+                'min_temp_at' => $minTemp['at'],
+                'max_volt_cell' => $maxVoltCell['value'],
+                'min_volt_cell' => $minVoltCell['value'],
+                'max_volt_cell_at' => $maxVoltCell['at'],
+                'min_volt_cell_at' => $minVoltCell['at'],
+                'max_thd' => $maxThd['value'],
+                'min_thd' => $minThd['value'],
+                'max_thd_at' => $maxThd['at'],
+                'min_thd_at' => $minThd['at'],
+                'max_soc' => $maxSoc['value'],
+                'min_soc' => $minSoc['value'],
+                'max_soc_at' => $maxSoc['at'],
+                'min_soc_at' => $minSoc['at'],
+                'max_soh' => $maxSoh['value'],
+                'min_soh' => $minSoh['value'],
+                'max_soh_at' => $maxSoh['at'],
+                'min_soh_at' => $minSoh['at'],
+                'max_voltage_charge' => $maxVoltCharge['value'],
+                'min_voltage_charge' => $minVoltCharge['value'],
+                'max_voltage_charge_at' => $maxVoltCharge['at'],
+                'min_voltage_charge_at' => $minVoltCharge['at'],
+                'max_current_charge' => $maxCurrentCharge['value'],
+                'min_current_charge' => $minCurrentCharge['value'],
+                'max_current_charge_at' => $maxCurrentCharge['at'],
+                'min_current_charge_at' => $minCurrentCharge['at'],
             ];
         });
 

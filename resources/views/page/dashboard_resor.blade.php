@@ -1,18 +1,16 @@
-@extends('layouts.master')
+﻿@extends('layouts.master')
 
-@section('title', 'Dashboard Total')
+@section('title', 'Dashboard Resor - '.$resor->nama)
 
 @section('content')
 <div class="row">
 
-    {{-- MAP --}}
     <div class="col-md-12">
         <div id="map"></div>
     </div>
 
-    {{-- BATTERY PERFORMANCE --}}
     <div class="col-md-12 mt-4">
-        <h4 class="card-title">Battery Performance</h4>
+        <h4 class="card-title">Battery Performance - {{ $resor->nama }}</h4>
 
         <div class="row row-card-no-pd mt-2">
             @foreach ($gardu as $g)
@@ -58,14 +56,8 @@
 </div>
 @endsection
 
-{{-- ================== EXTRA CSS & JS ================== --}}
 @section('adding')
-
-{{-- Leaflet CSS --}}
-<link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
 <style>
     #map {
@@ -74,13 +66,10 @@
     }
 </style>
 
-{{-- Kirim data PHP → JS --}}
 <script>
     const garduData = @json($gardu);
-    console.log('Gardu:', garduData);
 </script>
 
-{{-- Leaflet JS --}}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
@@ -104,8 +93,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     garduData.forEach((g, i) => {
         if (g.latitude && g.longitude) {
-
-            // offset biar marker tidak numpuk
             const offset = i * 0.0003;
 
             const lat = parseFloat(g.latitude) + offset;

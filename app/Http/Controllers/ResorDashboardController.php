@@ -1,12 +1,14 @@
 <?php
 
 namespace App\Http\Controllers;
-use App\Models\Gardu;
-use Illuminate\Support\Facades\DB; 
 
-class DashboardController extends Controller
+use App\Models\Gardu;
+use App\Models\Resor;
+use Illuminate\Support\Facades\DB;
+
+class ResorDashboardController extends Controller
 {
-    public function dashboard()
+    public function index(Resor $resor)
     {
         // subquery: data battery_monitoring terakhir per battery
         $latestMonitoring = DB::table('battery_monitoring as bm1')
@@ -28,7 +30,6 @@ class DashboardController extends Controller
                 }
             );
 
-        // query utama: avg soh seluruh gardu
         $gardu = Gardu::select(
                 'gardu.id',
                 'gardu.kode',
@@ -39,6 +40,7 @@ class DashboardController extends Controller
                 'gardu.n_batt',
                 DB::raw('ROUND(AVG(lm.soh), 2) as avg_soh')
             )
+            ->where('gardu.resor_id', $resor->id)
             ->leftJoin('battery', 'battery.gardu_id', '=', 'gardu.id')
             ->leftJoinSub($latestMonitoring, 'lm', function ($join) {
                 $join->on('lm.battery_id', '=', 'battery.id');
@@ -54,6 +56,6 @@ class DashboardController extends Controller
             )
             ->get();
 
-        return view('dashboard', compact('gardu'));
+        return view('page.dashboard_resor', compact('resor', 'gardu'));
     }
 }

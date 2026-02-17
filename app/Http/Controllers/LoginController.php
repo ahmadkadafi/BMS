@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Resor;
 use App\Models\User;
 use App\Support\ResorUserResolver;
 use Illuminate\Http\RedirectResponse;
@@ -14,7 +15,18 @@ class LoginController extends Controller
     public function login(Request $request): View|RedirectResponse
     {
         if ($request->session()->has('auth_user')) {
-            return redirect()->route('dashboard');
+            $authUser = $request->session()->get('auth_user', []);
+            if (($authUser['role'] ?? null) === 'admin') {
+                return redirect()->route('dashboard');
+            }
+            if (isset($authUser['allowed_resor_id'])) {
+                return redirect()->route('dashboard.resor', ['resor' => $authUser['allowed_resor_id']]);
+            }
+            $firstResorId = Resor::query()->orderBy('id')->value('id');
+            if ($firstResorId) {
+                return redirect()->route('dashboard.resor', ['resor' => $firstResorId]);
+            }
+            return redirect()->route('login');
         }
 
         return view('page.login');
@@ -62,7 +74,7 @@ class LoginController extends Controller
         $request->session()->put('auth_user', $authUser);
 
         if (isset($authUser['allowed_resor_id'])) {
-            return redirect()->route('monitoring.resor', ['resor' => $authUser['allowed_resor_id']]);
+            return redirect()->route('dashboard.resor', ['resor' => $authUser['allowed_resor_id']]);
         }
 
         return redirect()->route('dashboard')->with('status', 'Login berhasil. Selamat datang di Dashboard Monitoring Battery.');

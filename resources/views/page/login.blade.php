@@ -17,7 +17,7 @@
             </div>
 
             <div class="system-copy">
-                <p>Sistem Battery Management System adalah sistem pemantauan kondisi baterai gardu traksi secara real-time untuk mendukung keandalan operasional.</p>
+                <p>Battery Management System adalah sistem pemantauan kondisi baterai gardu traksi secara real-time untuk mendukung keandalan operasional.</p>
             </div>
 
             @if (session('status'))

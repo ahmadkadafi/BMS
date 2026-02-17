@@ -30,17 +30,41 @@
         @php
             $authUser = session('auth_user', []);
             $isRangkasOnly = strcasecmp(trim((string) ($authUser['username'] ?? '')), 'LAA 1.1 RK') === 0;
+            $defaultResorId = $resors->first()?->id;
+            $aiPredictionUrl = ($authUser['role'] ?? null) === 'admin'
+                ? route('dashboard')
+                : ($defaultResorId ? route('dashboard.resor', ['resor' => $defaultResorId]) : '#');
         @endphp
         <ul class="nav nav-secondary">
             @if (! $isRangkasOnly)
+            @if (($authUser['role'] ?? null) === 'admin')
             <li class="nav-item">
                 <a href="{{ route('dashboard') }}">
                     <i class="fas fa-home"></i>
-                    <p>Dashboard</p>
+                    <p>Dashboard Total</p>
                 </a>
             </li>
+            @endif
             <li class="nav-item">
-                <a href="{{ route('dashboard') }}">
+                <a data-bs-toggle="collapse" href="#dashboardResor">
+                    <i class="fas fa-building"></i>
+                    <p>Dashboard Resor</p>
+                    <span class="caret"></span>
+                </a>
+                <div class="collapse" id="dashboardResor">
+                    <ul class="nav nav-collapse">
+                        @foreach ($resors as $resor)
+                            <li>
+                                <a href="{{ route('dashboard.resor', ['resor' => $resor->id]) }}">
+                                    <span class="sub-item">{{ $resor->nama }}</span>
+                                </a>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            </li>
+            <li class="nav-item">
+                <a href="{{ $aiPredictionUrl }}">
                     <i class="fas fa-brain"></i>
                     <p>AI Prediction</p>
                 </a>

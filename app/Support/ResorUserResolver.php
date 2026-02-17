@@ -27,10 +27,11 @@ class ResorUserResolver
             'RK' => ['rangkas', 'rangkasbitung'],
             'DP' => ['depok'],
             'NMO' => ['nambo'],
-            'BOO' => ['bogor', 'bojong'],
+            'BOO' => ['bogor'],
             'THB' => ['tanah abang', 'tanahabang'],
             'PRP' => ['parung panjang', 'parungpanjang'],
             'PSM' => ['pasar minggu', 'pasarminggu'],
+            'SRP' => ['serpong'],
         ];
 
         $candidates = $map[$suffix] ?? [];
@@ -59,6 +60,9 @@ class ResorUserResolver
             return null;
         }
 
-        return strtoupper((string) end($parts));
+        $suffix = strtoupper((string) end($parts));
+        $suffix = preg_replace('/[^A-Z0-9]/', '', $suffix) ?? '';
+
+        return $suffix !== '' ? $suffix : null;
     }
 }
