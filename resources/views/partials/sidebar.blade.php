@@ -27,19 +27,25 @@
     </div>
     <div class="sidebar-wrapper scrollbar scrollbar-inner">
         <div class="sidebar-content">
+        @php
+            $authUser = session('auth_user', []);
+            $isRangkasOnly = strcasecmp(trim((string) ($authUser['username'] ?? '')), 'LAA 1.1 RK') === 0;
+        @endphp
         <ul class="nav nav-secondary">
+            @if (! $isRangkasOnly)
             <li class="nav-item">
-                <a href="/">
+                <a href="{{ route('dashboard') }}">
                     <i class="fas fa-home"></i>
                     <p>Dashboard</p>
                 </a>
             </li>
             <li class="nav-item">
-                <a href="/">
+                <a href="{{ route('dashboard') }}">
                     <i class="fas fa-brain"></i>
                     <p>AI Prediction</p>
                 </a>
             </li>
+            @endif
             <li class="nav-item">
                 <a data-bs-toggle="collapse" href="#monitoring">
                     <i class="fas fa-desktop"></i>
@@ -113,24 +119,6 @@
                 </div>
             </li>
             <li class="nav-item">
-            <a data-bs-toggle="collapse" href="#report">
-                <i class="fas fa-file"></i>
-                <p>Report</p>
-                <span class="caret"></span>
-            </a>
-            <div class="collapse" id="report">
-                <ul class="nav nav-collapse">
-                    @foreach ($resors as $resor)
-                        <li>
-                            <a href="{{ url('/report/resor/'.$resor->id) }}">
-                                <span class="sub-item">{{ $resor->nama }}</span>
-                            </a>
-                        </li>
-                    @endforeach
-                </ul>
-            </div>
-            </li>
-            <li class="nav-item">
             <a data-bs-toggle="collapse" href="#logger">
                 <i class="fas fa-table"></i>
                 <p>Logger</p>
@@ -141,6 +129,24 @@
                     @foreach ($resors as $resor)
                         <li>
                             <a href="{{ url('/logger/resor/'.$resor->id) }}">
+                                <span class="sub-item">{{ $resor->nama }}</span>
+                            </a>
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+            </li>
+            <li class="nav-item">
+            <a data-bs-toggle="collapse" href="#report">
+                <i class="fas fa-file"></i>
+                <p>Report</p>
+                <span class="caret"></span>
+            </a>
+            <div class="collapse" id="report">
+                <ul class="nav nav-collapse">
+                    @foreach ($resors as $resor)
+                        <li>
+                            <a href="{{ url('/report/resor/'.$resor->id) }}">
                                 <span class="sub-item">{{ $resor->nama }}</span>
                             </a>
                         </li>
@@ -167,17 +173,39 @@
             </div>
             </li>
             <li class="nav-item">
+            <a data-bs-toggle="collapse" href="#chargersetting">
+                <i class="fas fa-charging-station"></i>
+                <p>Charger Setting</p>
+                <span class="caret"></span>
+            </a>
+            <div class="collapse" id="chargersetting">
+                <ul class="nav nav-collapse">
+                    @foreach ($resors as $resor)
+                        <li>
+                            <a href="{{ url('/chargersetting/resor/'.$resor->id) }}">
+                                <span class="sub-item">{{ $resor->nama }}</span>
+                            </a>
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+            </li>
+            @if (! $isRangkasOnly)
+            @if (($authUser['role'] ?? null) === 'admin')
+            <li class="nav-item">
+            <a href="{{ route('input.index') }}">
+                <i class="fas fa-database"></i>
+                <p>Input Data</p>
+            </a>
+            </li>
+            @endif
+            <li class="nav-item">
             <a href="/about">
                 <i class="fas fa-info-circle"></i>
                 <p>About</p>
             </a>
             </li>
-            <li class="nav-item">
-            <a href="/test">
-                <i class="fas fa-info-circle"></i>
-                <p>Test</p>
-            </a>
-            </li>
+            @endif
         </ul>
         </div>
     </div>

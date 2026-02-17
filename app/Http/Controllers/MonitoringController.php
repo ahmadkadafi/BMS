@@ -17,6 +17,10 @@ class MonitoringController extends Controller
                 $q->with(['monitorings' => function ($qm) {
                     $qm->latest('measured_at')->limit(1);
                 }]);
+            }, 'chargers' => function ($q) {
+                $q->with(['monitorings' => function ($qm) {
+                    $qm->latest('measured_at')->limit(1);
+                }]);
             }])
             ->get();
 

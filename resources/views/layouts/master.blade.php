@@ -9,7 +9,7 @@
     />
     <link
       rel="icon"
-      href="{{asset('templating/assets/img/kaiadmin/favicon.ico')}}"
+      href="{{asset('templating/assets/img/kaiadmin/icon_kai.png')}}"
       type="image/x-icon"
     />
 
@@ -50,10 +50,7 @@
 
         <div class="container">
           <div class="page-inner">
-            <div class="page-header">
-              <h3 class="fw-bold">@yield('title')</h3>
-            </div>
-              @yield('content')
+            @yield('content')
           </div>
         </div>
         @include('partials.footer')

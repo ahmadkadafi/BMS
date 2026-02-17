@@ -24,6 +24,11 @@ class Gardu extends Model
         return $this->hasMany(Battery::class);
     }
 
+    public function chargers()
+    {
+        return $this->hasMany(Charger::class);
+    }
+
     public function batterySetting()
     {
         return $this->hasOne(BatterySetting::class, 'gardu_id');

@@ -24,6 +24,9 @@ class GraphicController extends Controller
         $gardu = Gardu::with([
             'batteries.monitorings' => function ($q) {
                 $q->latest('measured_at');
+            },
+            'chargers.monitorings' => function ($q) {
+                $q->latest('measured_at')->limit(1);
             }
         ])
         ->where('resor_id', $resor->id)

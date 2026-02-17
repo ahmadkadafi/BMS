@@ -3,25 +3,61 @@
 @section('title', 'Graphic - '.$resor->nama)
 
 @section('content')
+<style>
+    .graphic-filter-card {
+        border: 0;
+        border-radius: 16px;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+    }
+    .filter-inline {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: nowrap;
+    }
+    .filter-inline .form-label {
+        margin-bottom: 0;
+        white-space: nowrap;
+    }
+    .filter-inline .form-select {
+        width: 320px;
+        min-width: 260px;
+    }
+    .graphic-gardu-card {
+        border: 0;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 10px 26px rgba(0, 0, 0, 0.08);
+    }
+    .graphic-gardu-head {
+        background: linear-gradient(90deg, #f8fbff, #edf6ff);
+        border-bottom: 1px solid #deebf8;
+    }
+    .badge-status {
+        border-radius: 30px;
+        font-size: 11px;
+        padding: 6px 10px;
+        white-space: normal;
+        text-align: center;
+    }
+</style>
+
 <div class="page-inner">
 
     {{-- FILTER GARDU --}}
-    <div class="card mb-4">
+    <div class="card graphic-filter-card mb-4">
         <div class="card-body">
             <form method="GET">
-                <div class="row align-items-end">
-                    <div class="col-md-4">
-                        <label class="form-label fw-bold">Pilih Lokasi Gardu</label>
-                        <select name="gardu_id" class="form-select" onchange="this.form.submit()">
-                            <option value="">-- Semua Gardu --</option>
-                            @foreach ($gardu as $g)
-                                <option value="{{ $g->id }}"
-                                    {{ request('gardu_id') == $g->id ? 'selected' : '' }}>
-                                    {{ $g->nama }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
+                <div class="filter-inline">
+                    <label class="form-label fw-bold"><i class="fa fa-filter mr-1 text-primary"></i>Pilih Lokasi Gardu</label>
+                    <select name="gardu_id" class="form-select" onchange="this.form.submit()">
+                        <option value="">-- Semua Gardu --</option>
+                        @foreach ($gardu as $g)
+                            <option value="{{ $g->id }}" {{ request('gardu_id') == $g->id ? 'selected' : '' }}>
+                                {{ $g->nama }}
+                            </option>
+                        @endforeach
+                    </select>
                 </div>
             </form>
         </div>
@@ -55,21 +91,36 @@
                 $soc[]  = $last->soc ?? 0;
                 $soh[]  = $last->soh ?? 0;
             }
+
+            $latestChargerMonitoring = $g->chargers
+                ->flatMap->monitorings
+                ->sortByDesc('measured_at')
+                ->first();
         @endphp
 
-        <div class="card mb-5">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    {{ $g->nama }}
-                    <small class="text-muted">({{ count($labels) }} Battery)</small>
-                </h5>
+        <div class="card graphic-gardu-card mb-5">
+            <div class="card-header graphic-gardu-head">
+                <div class="d-flex flex-wrap align-items-center justify-content-between">
+                    <h5 class="card-title mb-0">
+                        <i class="fa fa-chart-bar text-primary mr-1"></i>{{ $g->nama }}
+                        <small class="text-muted">({{ count($labels) }} Battery)</small>
+                    </h5>
+                    <div class="d-flex flex-wrap justify-content-end" style="gap: 6px;">
+                        <span class="badge badge-light text-dark badge-status">
+                            <i class="fa fa-charging-station mr-1 text-warning"></i>Volt Charge {{ $latestChargerMonitoring->voltage ?? '-' }} V
+                        </span>
+                        <span class="badge badge-light text-dark badge-status">
+                            <i class="fa fa-tachometer-alt mr-1 text-secondary"></i>Current Charge {{ $latestChargerMonitoring->current ?? '-' }} A
+                        </span>
+                    </div>
+                </div>
             </div>
 
             <div class="card-body">
                 <div class="row g-4">
 
                     {{-- VOLT --}}
-                    <div class="col-lg-6">
+                    <div class="col-lg-4">
                         <div class="chart-card">
                             <div class="chart-header">
                                 <i class="fas fa-battery-three-quarters text-success"></i>
@@ -82,11 +133,11 @@
                     </div>
 
                     {{-- TEMP --}}
-                    <div class="col-lg-6">
+                    <div class="col-lg-4">
                         <div class="chart-card">
                             <div class="chart-header">
                                 <i class="fas fa-thermometer-half text-danger"></i>
-                                Temperature (°C)
+                                Temperature (&deg;C)
                             </div>
                             <div class="chart-box">
                                 <canvas id="tempChart{{ $g->id }}"></canvas>
@@ -95,7 +146,7 @@
                     </div>
 
                     {{-- THD --}}
-                    <div class="col-lg-6">
+                    <div class="col-lg-4">
                         <div class="chart-card">
                             <div class="chart-header">
                                 <i class="fas fa-wave-square text-info"></i>
@@ -108,7 +159,7 @@
                     </div>
 
                     {{-- SOC --}}
-                    <div class="col-lg-6">
+                    <div class="col-lg-4">
                         <div class="chart-card">
                             <div class="chart-header">
                                 <i class="fas fa-percent text-primary"></i>
@@ -121,7 +172,7 @@
                     </div>
 
                     {{-- SOH --}}
-                    <div class="col-lg-12">
+                    <div class="col-lg-4">
                         <div class="chart-card">
                             <div class="chart-header">
                                 <i class="fas fa-heartbeat text-warning"></i>
@@ -156,10 +207,11 @@
 
 <style>
 .chart-card {
-    border: 1px solid #e9ecef;
-    border-radius: 10px;
-    padding: 15px;
-    background: #fff;
+    border: 1px solid #dfe8f3;
+    border-radius: 12px;
+    padding: 14px;
+    background: linear-gradient(180deg, #ffffff, #f9fcff);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
 }
 
 .chart-header {

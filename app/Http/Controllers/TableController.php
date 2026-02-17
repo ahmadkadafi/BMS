@@ -6,34 +6,56 @@ use Illuminate\Http\Request;
 use App\Models\Resor;
 use App\Models\Gardu;
 use App\Models\BatteryMonitoring;
+use App\Models\ChargerMonitoring;
+use Illuminate\Support\Facades\DB;
 
 class TableController extends Controller
 {
     public function index(Request $request, Resor $resor)
     {
-        $gardu = Gardu::where('resor_id', $resor->id)->get();
+        $gardu = Gardu::where('resor_id', $resor->id)
+            ->with(['batteries:id,gardu_id', 'chargers:id,gardu_id'])
+            ->orderBy('nama')
+            ->get();
+
+        $garduData = $request->filled('gardu_id')
+            ? $gardu->where('id', (int) $request->gardu_id)->values()
+            : $gardu;
+
+        $garduIds = $garduData->pluck('id');
+        $maxBatt = $garduData->max(fn ($g) => $g->batteries->count()) ?? 0;
+        $maxCharger = $garduData->max(fn ($g) => $g->chargers->count()) ?? 0;
 
         /*
         |--------------------------------------------------------------------------
         | SNAPSHOT TIME (PAGINATION)
         |--------------------------------------------------------------------------
         */
-        $times = BatteryMonitoring::select('measured_at')
-            ->whereHas('battery.gardu', function ($q) use ($resor, $request) {
-                $q->where('resor_id', $resor->id);
-
-                if ($request->filled('gardu_id')) {
-                    $q->where('id', $request->gardu_id);
-                }
-            })
+        $batteryTimes = BatteryMonitoring::query()
+            ->select('measured_at')
+            ->whereHas('battery', fn ($q) => $q->whereIn('gardu_id', $garduIds))
             ->when($request->filled('from'), fn ($q) =>
                 $q->whereDate('measured_at', '>=', $request->from)
             )
             ->when($request->filled('to'), fn ($q) =>
                 $q->whereDate('measured_at', '<=', $request->to)
+            );
+
+        $chargerTimes = ChargerMonitoring::query()
+            ->select('measured_at')
+            ->whereHas('charger', fn ($q) => $q->whereIn('gardu_id', $garduIds))
+            ->when($request->filled('from'), fn ($q) =>
+                $q->whereDate('measured_at', '>=', $request->from)
             )
-            ->orderByDesc('measured_at')
+            ->when($request->filled('to'), fn ($q) =>
+                $q->whereDate('measured_at', '<=', $request->to)
+            );
+
+        $times = DB::query()
+            ->fromSub($batteryTimes->union($chargerTimes), 'snapshots')
+            ->select('measured_at')
             ->distinct()
+            ->orderByDesc('measured_at')
             ->paginate(5)
             ->withQueryString(); // 5 snapshot per halaman
 
@@ -45,31 +67,41 @@ class TableController extends Controller
         $data = [];
 
         foreach ($times as $time) {
-            $rows = BatteryMonitoring::with(['battery.gardu'])
+            $batteryRows = BatteryMonitoring::with(['battery:id,gardu_id'])
                 ->where('measured_at', $time->measured_at)
-                ->whereHas('battery.gardu', fn ($q) =>
-                    $q->where('resor_id', $resor->id)
-                )
-                ->when($request->filled('gardu_id'), fn ($q) =>
-                    $q->whereHas('battery.gardu', fn ($qq) =>
-                        $qq->where('id', $request->gardu_id)
-                    )
-                )
+                ->whereHas('battery', fn ($q) => $q->whereIn('gardu_id', $garduIds))
                 ->orderBy('battery_id')
-                ->get();
+                ->get()
+                ->groupBy(fn ($row) => optional($row->battery)->gardu_id);
 
-            $data[] = [
-                'time' => $time->measured_at,
-                'gardu' => optional($rows->first()?->battery?->gardu)->nama,
-                'rows' => $rows
-            ];
+            $chargerRows = ChargerMonitoring::with(['charger:id,gardu_id'])
+                ->where('measured_at', $time->measured_at)
+                ->whereHas('charger', fn ($q) => $q->whereIn('gardu_id', $garduIds))
+                ->orderBy('charger_id')
+                ->get()
+                ->groupBy(fn ($row) => optional($row->charger)->gardu_id);
+
+            foreach ($garduData as $g) {
+                $data[] = [
+                    'time' => $time->measured_at,
+                    'gardu' => $g->nama,
+                    'batteries' => ($batteryRows->get($g->id) ?? collect())->values(),
+                    'chargers' => ($chargerRows->get($g->id) ?? collect())->values(),
+                ];
+            }
+        }
+
+        if ($request->filled('from') || $request->filled('to')) {
+            $times->appends($request->query());
         }
 
         return view('page.table', compact(
             'resor',
             'gardu',
             'data',
-            'times'
+            'times',
+            'maxBatt',
+            'maxCharger'
         ));
     }
 }

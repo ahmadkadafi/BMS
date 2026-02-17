@@ -1,3 +1,12 @@
+@php
+    $authUser = session('auth_user', []);
+    $notificationCount = $notificationCount ?? 0;
+    $warningCount = $warningCount ?? 0;
+    $alarmCount = $alarmCount ?? 0;
+    $latestNotifications = $latestNotifications ?? collect();
+    $notificationResorId = $notificationResorId ?? null;
+@endphp
+
 <div class="main-header">
 <div class="main-header-logo">
     <!-- Logo Header -->
@@ -97,7 +106,7 @@
             aria-expanded="false"
         >
             <i class="fa fa-bell"></i>
-            <span class="notification">1</span>
+            <span class="notification">{{ $notificationCount }}</span>
         </a>
         <ul
             class="dropdown-menu notif-box animated fadeIn"
@@ -105,11 +114,34 @@
         >
             <li>
             <div class="dropdown-title">
-                You have 1 new notification
+                Alarm: {{ $alarmCount }} | Warning: {{ $warningCount }}
             </div>
             </li>
             <li>
-            <a class="see-all" href="javascript:void(0);"
+                <div class="notif-scroll scrollbar-outer">
+                    <div class="notif-center">
+                        @forelse ($latestNotifications as $notif)
+                            <a href="{{ $notificationResorId ? url('/logger/resor/'.$notificationResorId) : 'javascript:void(0);' }}">
+                                <div class="notif-icon notif-{{ $notif->status === 'alarm' ? 'danger' : 'warning' }}">
+                                    <i class="fa fa-bell"></i>
+                                </div>
+                                <div class="notif-content">
+                                    <span class="block">{{ $notif->message }}</span>
+                                    <span class="time">
+                                        {{ $notif->occurred_at?->format('d/m/Y H:i:s') }}
+                                        | {{ strtoupper($notif->status) }}
+                                        | {{ $notif->gardu?->nama ?? '-' }}
+                                    </span>
+                                </div>
+                            </a>
+                        @empty
+                            <div class="px-3 py-2 text-muted">Belum ada notifikasi.</div>
+                        @endforelse
+                    </div>
+                </div>
+            </li>
+            <li>
+            <a class="see-all" href="{{ $notificationResorId ? url('/logger/resor/'.$notificationResorId) : 'javascript:void(0);' }}"
                 >See all notifications<i class="fa fa-angle-right"></i>
             </a>
             </li>
@@ -132,7 +164,7 @@
             </div>
             <span class="profile-username">
             <span class="op-7">Hi,</span>
-            <span class="fw-bold">Ahmad Kadafi</span>
+            <span class="fw-bold">{{ $authUser['username'] ?? 'User' }}</span>
             </span>
         </a>
         <ul class="dropdown-menu dropdown-user animated fadeIn">
@@ -147,21 +179,18 @@
                     />
                 </div>
                 <div class="u-text">
-                    <h4>Ahmad Kadafi</h4>
-                    <p class="text-muted">akadafi12@gmail.com</p>
-                    <a
-                    href="profile.html"
-                    class="btn btn-xs btn-secondary btn-sm"
-                    >View Profile</a
-                    >
+                    <h4>{{ $authUser['username'] ?? '-' }}</h4>
+                    <p class="text-muted">{{ $authUser['email'] ?? '-' }}</p>
+                    <span class="badge bg-secondary">{{ strtoupper($authUser['role'] ?? 'USER') }}</span>
                 </div>
                 </div>
             </li>
             <li>
                 <div class="dropdown-divider"></div>
-                <a class="dropdown-item" href="#">Account Setting</a>
-                <div class="dropdown-divider"></div>
-                <a class="dropdown-item" href="#">Logout</a>
+                <form action="{{ route('logout') }}" method="POST" class="px-3 py-2">
+                    @csrf
+                    <button type="submit" class="btn btn-danger btn-sm w-100">Logout</button>
+                </form>
             </li>
             </div>
         </ul>

@@ -1,0 +1,116 @@
+.auth-wrapper {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #e6ebf5, #f4f7fb);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.login-shell {
+    width: 100%;
+    max-width: 1120px;
+    min-height: 700px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-radius: 24px;
+    overflow: hidden;
+    background: #ffffff;
+    box-shadow: 0 20px 45px rgba(15, 23, 42, 0.16);
+}
+
+.login-visual {
+    position: relative;
+    min-height: 100%;
+    background: url('/templating/assets/img/examples/login_illustration.png') center/cover no-repeat;
+}
+
+.login-visual::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(9, 18, 45, 0.18), rgba(9, 18, 45, 0.45));
+}
+
+.login-body {
+    padding: 46px 40px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.login-brand {
+    margin-bottom: 20px;
+}
+
+.login-brand img {
+    width: 400px;
+    max-width: 100%;
+    height: auto;
+}
+
+.system-copy h1 {
+    color: #0f2450;
+    font-size: 2rem;
+    line-height: 1.2;
+    margin-bottom: 8px;
+}
+
+.system-copy p {
+    color: #4f5f7d;
+    margin-bottom: 22px;
+}
+
+.helper-text {
+    font-size: 0.9rem;
+    color: #60708e;
+}
+
+.form-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #1f2a44;
+}
+
+.form-control {
+    padding: 0.75rem 0.86rem;
+    border-radius: 10px;
+    border: 1px solid #d6deeb;
+}
+
+.form-control:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.16rem rgba(13, 110, 253, 0.2);
+}
+
+.btn-login {
+    background: #0b1f44;
+    border: none;
+    border-radius: 10px;
+    padding: 0.8rem;
+    font-size: 1.05rem;
+    font-weight: 600;
+}
+
+@media (max-width: 991.98px) {
+    .auth-wrapper {
+        padding: 14px;
+    }
+
+    .login-shell {
+        min-height: auto;
+        grid-template-columns: 1fr;
+    }
+
+    .login-visual {
+        min-height: 300px;
+    }
+
+    .login-body {
+        padding: 28px 20px 24px;
+    }
+
+    .system-copy h1 {
+        font-size: 1.55rem;
+    }
+}

@@ -16,6 +16,10 @@ class LineController extends Controller
                     // ambil data 7 hari terakhir saja
                     $q->where('measured_at', '>=', now()->subDays(7))
                       ->orderBy('measured_at');
+                },
+                'chargers.monitorings' => function ($q) {
+                    $q->where('measured_at', '>=', now()->subDays(7))
+                      ->orderBy('measured_at');
                 }
             ])
             ->orderBy('nama')
