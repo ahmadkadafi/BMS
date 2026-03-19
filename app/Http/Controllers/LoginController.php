@@ -16,17 +16,19 @@ class LoginController extends Controller
     {
         if ($request->session()->has('auth_user')) {
             $authUser = $request->session()->get('auth_user', []);
+
             if (($authUser['role'] ?? null) === 'admin') {
                 return redirect()->route('dashboard');
             }
+
             if (isset($authUser['allowed_resor_id'])) {
                 return redirect()->route('dashboard.resor', ['resor' => $authUser['allowed_resor_id']]);
             }
+
             $firstResorId = Resor::query()->orderBy('id')->value('id');
             if ($firstResorId) {
                 return redirect()->route('dashboard.resor', ['resor' => $firstResorId]);
             }
-            return redirect()->route('login');
         }
 
         return view('page.login');
@@ -43,7 +45,7 @@ class LoginController extends Controller
             ->where('username', $credentials['username'])
             ->first();
 
-        if (! $user || ! $this->passwordMatches($credentials['password'], $user->password)) {
+        if (! $user || ! $this->passwordMatches($credentials['password'], (string) $user->password)) {
             return back()->withInput($request->only('username'))->withErrors([
                 'username' => 'Username atau password tidak sesuai.',
             ]);
@@ -77,7 +79,8 @@ class LoginController extends Controller
             return redirect()->route('dashboard.resor', ['resor' => $authUser['allowed_resor_id']]);
         }
 
-        return redirect()->route('dashboard')->with('status', 'Login berhasil. Selamat datang di Dashboard Monitoring Battery.');
+        return redirect()->route('dashboard')
+            ->with('status', 'Login berhasil. Selamat datang di Dashboard Monitoring Battery.');
     }
 
     public function logout(Request $request): RedirectResponse

@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use App\Models\Resor;
 use App\Models\Gardu;
 use App\Models\BatteryMonitoring;
 use App\Models\ChargerMonitoring;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TableController extends Controller
 {
@@ -15,22 +18,55 @@ class TableController extends Controller
     {
         $gardu = Gardu::where('resor_id', $resor->id)
             ->with(['batteries:id,gardu_id', 'chargers:id,gardu_id'])
-            ->orderBy('nama')
+            ->orderBy('id')
             ->get();
 
-        $garduData = $request->filled('gardu_id')
-            ? $gardu->where('id', (int) $request->gardu_id)->values()
-            : $gardu;
+        $defaultGarduId = $gardu->min('id');
+        $selectedGarduId = $request->filled('gardu_id')
+            ? (int) $request->gardu_id
+            : $defaultGarduId;
+
+        $garduData = $selectedGarduId
+            ? $gardu->where('id', $selectedGarduId)->values()
+            : collect();
 
         $garduIds = $garduData->pluck('id');
         $maxBatt = $garduData->max(fn ($g) => $g->batteries->count()) ?? 0;
         $maxCharger = $garduData->max(fn ($g) => $g->chargers->count()) ?? 0;
+        $selectedTable = $request->input('table', 'volt');
+        $allRows = $this->buildRows($request, $garduData, $garduIds);
 
-        /*
-        |--------------------------------------------------------------------------
-        | SNAPSHOT TIME (PAGINATION)
-        |--------------------------------------------------------------------------
-        */
+        if ($request->boolean('export')) {
+            return $this->exportCsv($resor, $allRows, $selectedTable, $maxBatt);
+        }
+
+        $perPage = 10;
+        $currentPage = LengthAwarePaginator::resolveCurrentPage();
+        $pageRows = $allRows->slice(($currentPage - 1) * $perPage, $perPage)->values();
+        $rows = new LengthAwarePaginator(
+            $pageRows,
+            $allRows->count(),
+            $perPage,
+            $currentPage,
+            [
+                'path' => $request->url(),
+                'query' => $request->query(),
+            ]
+        );
+
+        return view('page.table', compact(
+            'resor',
+            'gardu',
+            'selectedGarduId',
+            'rows',
+            'selectedTable',
+            'maxBatt',
+            'maxCharger'
+        ));
+    }
+
+    private function buildRows(Request $request, $garduData, $garduIds)
+    {
         $batteryTimes = BatteryMonitoring::query()
             ->select('measured_at')
             ->whereHas('battery', fn ($q) => $q->whereIn('gardu_id', $garduIds))
@@ -51,22 +87,16 @@ class TableController extends Controller
                 $q->whereDate('measured_at', '<=', $request->to)
             );
 
-        $times = DB::query()
+        $snapshotTimes = DB::query()
             ->fromSub($batteryTimes->union($chargerTimes), 'snapshots')
             ->select('measured_at')
             ->distinct()
             ->orderByDesc('measured_at')
-            ->paginate(5)
-            ->withQueryString(); // 5 snapshot per halaman
+            ->get();
 
-        /*
-        |--------------------------------------------------------------------------
-        | DATA PER SNAPSHOT
-        |--------------------------------------------------------------------------
-        */
-        $data = [];
+        $allRows = collect();
 
-        foreach ($times as $time) {
+        foreach ($snapshotTimes as $time) {
             $batteryRows = BatteryMonitoring::with(['battery:id,gardu_id'])
                 ->where('measured_at', $time->measured_at)
                 ->whereHas('battery', fn ($q) => $q->whereIn('gardu_id', $garduIds))
@@ -82,26 +112,76 @@ class TableController extends Controller
                 ->groupBy(fn ($row) => optional($row->charger)->gardu_id);
 
             foreach ($garduData as $g) {
-                $data[] = [
+                $allRows->push([
                     'time' => $time->measured_at,
                     'gardu' => $g->nama,
                     'batteries' => ($batteryRows->get($g->id) ?? collect())->values(),
                     'chargers' => ($chargerRows->get($g->id) ?? collect())->values(),
-                ];
+                ]);
             }
         }
 
-        if ($request->filled('from') || $request->filled('to')) {
-            $times->appends($request->query());
+        return $allRows;
+    }
+
+    private function exportCsv(Resor $resor, $rows, string $selectedTable, int $maxBatt): StreamedResponse
+    {
+        $columns = ['No', 'Date', 'Time'];
+        if ($selectedTable === 'charger') {
+            $columns[] = 'Volt Charge';
+            $columns[] = 'Current Charge';
+        } else {
+            $columns[] = 'Lokasi';
+            for ($i = 1; $i <= $maxBatt; $i++) {
+                $columns[] = 'Batt ' . $i;
+            }
         }
 
-        return view('page.table', compact(
-            'resor',
-            'gardu',
-            'data',
-            'times',
-            'maxBatt',
-            'maxCharger'
-        ));
+        $filename = sprintf(
+            'table-%s-%s.csv',
+            $resor->id,
+            now()->format('Ymd-His')
+        );
+
+        return response()->streamDownload(function () use ($rows, $selectedTable, $columns, $maxBatt) {
+            $handle = fopen('php://output', 'w');
+            fwrite($handle, "\xEF\xBB\xBF");
+            fputcsv($handle, $columns);
+
+            foreach ($rows->values() as $index => $row) {
+                $time = $row['time'] instanceof Carbon
+                    ? $row['time']
+                    : Carbon::parse($row['time']);
+
+                $line = [
+                    $index + 1,
+                    $time->format('d/m/Y'),
+                    $time->format('H:i:s'),
+                ];
+
+                if ($selectedTable === 'charger') {
+                    $line[] = collect($row['chargers'])
+                        ->pluck('voltage')
+                        ->filter(fn ($value) => $value !== null && $value !== '')
+                        ->implode(', ') ?: '-';
+                    $line[] = collect($row['chargers'])
+                        ->pluck('current')
+                        ->filter(fn ($value) => $value !== null && $value !== '')
+                        ->implode(', ') ?: '-';
+                } else {
+                    $line[] = $row['gardu'];
+                    for ($i = 0; $i < $maxBatt; $i++) {
+                        $battery = $row['batteries'][$i] ?? null;
+                        $line[] = $battery?->{$selectedTable} ?? '-';
+                    }
+                }
+
+                fputcsv($handle, $line);
+            }
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
     }
 }

@@ -46,7 +46,7 @@
                         placeholder="Masukkan username"
                         required
                         autofocus
-                    />
+                    >
                 </div>
 
                 <div class="mb-3">
@@ -58,7 +58,7 @@
                         name="password"
                         placeholder="Masukkan password"
                         required
-                    />
+                    >
                 </div>
 
                 <div class="d-grid mt-4">

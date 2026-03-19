@@ -3,6 +3,36 @@
 @section('title', 'Input Data Master')
 
 @section('content')
+@php
+    $sections = [
+        'users' => 'Users',
+        'daops' => 'Daop',
+        'resors' => 'Resor',
+        'gardus' => 'Gardu',
+        'chargers' => 'Charger',
+        'batteries' => 'Battery',
+    ];
+    $activeSection = request('section', 'users');
+@endphp
+
+<style>
+    .input-filter-card,
+    .input-section-card {
+        border: 0;
+        border-radius: 16px;
+        box-shadow: 0 10px 26px rgba(0, 0, 0, 0.08);
+    }
+    .input-section-card .card-header {
+        background: linear-gradient(90deg, #f8fbff, #edf6ff);
+        border-bottom: 1px solid #deebf8;
+    }
+    .input-section-card .table th,
+    .input-section-card .table td {
+        white-space: nowrap;
+        vertical-align: middle;
+    }
+</style>
+
 <div class="page-inner">
     @if (session('success'))
         <div class="alert alert-success">{{ session('success') }}</div>
@@ -11,187 +41,209 @@
         <div class="alert alert-danger">{{ $errors->first() }}</div>
     @endif
 
-    <div class="row g-4">
-        <div class="col-lg-6">
-            <div class="card h-100">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Users</h5>
-                    <button class="btn btn-primary btn-icon btn-sm" data-bs-toggle="modal" data-bs-target="#createUserModal" title="Tambah User"><i class="fas fa-plus"></i></button>
+    <div class="card input-filter-card mb-4">
+        <div class="card-body">
+            <form method="GET">
+                <div class="row g-3 align-items-end">
+                    <div class="col-lg-4">
+                        <label class="form-label fw-bold">Menu Input</label>
+                        <select name="section" class="form-select" onchange="this.form.submit()">
+                            @foreach ($sections as $key => $label)
+                                <option value="{{ $key }}" {{ $activeSection === $key ? 'selected' : '' }}>
+                                    {{ $label }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
                 </div>
-                <div class="card-body table-responsive">
-                    <table class="table table-bordered table-sm align-middle">
-                        <thead class="table-dark text-center"><tr><th>No</th><th>Username</th><th>Email</th><th>Role</th><th>Action</th></tr></thead>
-                        <tbody>
-                            @forelse ($users as $u)
-                                <tr>
-                                    <td class="text-center">{{ $users->firstItem() + $loop->index }}</td>
-                                    <td>{{ $u->username }}</td>
-                                    <td>{{ $u->email }}</td>
-                                    <td class="text-center">{{ $u->role }}</td>
-                                    <td>
-                                        <div class="d-flex gap-1 justify-content-center">
-                                            <button class="btn btn-warning btn-icon btn-sm" data-bs-toggle="modal" data-bs-target="#editUser{{ $u->id }}" title="Edit"><i class="fas fa-pen"></i></button>
-                                            <form method="POST" action="{{ route('input.users.destroy', $u->id) }}" onsubmit="return confirm('Hapus data ini?')">@csrf @method('DELETE')<button class="btn btn-danger btn-icon btn-sm" title="Delete"><i class="fas fa-trash"></i></button></form>
-                                        </div>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr><td colspan="5" class="text-center text-muted">Tidak ada data</td></tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                    {{ $users->links() }}
-                </div>
-            </div>
-        </div>
-
-        <div class="col-lg-6">
-            <div class="card h-100">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Daop</h5>
-                    <button class="btn btn-primary btn-icon btn-sm" data-bs-toggle="modal" data-bs-target="#createDaopModal" title="Tambah Daop"><i class="fas fa-plus"></i></button>
-                </div>
-                <div class="card-body table-responsive">
-                    <table class="table table-bordered table-sm align-middle">
-                        <thead class="table-dark text-center"><tr><th>No</th><th>Nama</th><th>Wilayah</th><th>Action</th></tr></thead>
-                        <tbody>
-                            @forelse ($daops as $d)
-                                <tr>
-                                    <td class="text-center">{{ $daops->firstItem() + $loop->index }}</td>
-                                    <td>{{ $d->nama }}</td>
-                                    <td>{{ $d->wilayah }}</td>
-                                    <td>
-                                        <div class="d-flex gap-1 justify-content-center">
-                                            <button class="btn btn-warning btn-icon btn-sm" data-bs-toggle="modal" data-bs-target="#editDaop{{ $d->id }}" title="Edit"><i class="fas fa-pen"></i></button>
-                                            <form method="POST" action="{{ route('input.daop.destroy', $d->id) }}" onsubmit="return confirm('Hapus data ini?')">@csrf @method('DELETE')<button class="btn btn-danger btn-icon btn-sm" title="Delete"><i class="fas fa-trash"></i></button></form>
-                                        </div>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr><td colspan="4" class="text-center text-muted">Tidak ada data</td></tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                    {{ $daops->links() }}
-                </div>
-            </div>
-        </div>
-        <div class="col-lg-6">
-            <div class="card h-100">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Resor</h5>
-                    <button class="btn btn-primary btn-icon btn-sm" data-bs-toggle="modal" data-bs-target="#createResorModal" title="Tambah Resor"><i class="fas fa-plus"></i></button>
-                </div>
-                <div class="card-body table-responsive">
-                    <table class="table table-bordered table-sm align-middle">
-                        <thead class="table-dark text-center"><tr><th>No</th><th>Nama</th><th>Daop</th><th>n_asset</th><th>Action</th></tr></thead>
-                        <tbody>
-                            @forelse ($resors as $r)
-                                <tr>
-                                    <td class="text-center">{{ $resors->firstItem() + $loop->index }}</td>
-                                    <td>{{ $r->nama }}</td>
-                                    <td>{{ $r->daop?->nama ?? '-' }}</td>
-                                    <td class="text-center">{{ $r->n_asset }}</td>
-                                    <td><div class="d-flex gap-1 justify-content-center"><button class="btn btn-warning btn-icon btn-sm" data-bs-toggle="modal" data-bs-target="#editResor{{ $r->id }}" title="Edit"><i class="fas fa-pen"></i></button><form method="POST" action="{{ route('input.resor.destroy', $r->id) }}" onsubmit="return confirm('Hapus data ini?')">@csrf @method('DELETE')<button class="btn btn-danger btn-icon btn-sm" title="Delete"><i class="fas fa-trash"></i></button></form></div></td>
-                                </tr>
-                            @empty
-                                <tr><td colspan="5" class="text-center text-muted">Tidak ada data</td></tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                    {{ $resors->links() }}
-                </div>
-            </div>
-        </div>
-
-        <div class="col-lg-6">
-            <div class="card h-100">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Gardu</h5>
-                    <button class="btn btn-primary btn-icon btn-sm" data-bs-toggle="modal" data-bs-target="#createGarduModal" title="Tambah Gardu"><i class="fas fa-plus"></i></button>
-                </div>
-                <div class="card-body table-responsive">
-                    <table class="table table-bordered table-sm align-middle">
-                        <thead class="table-dark text-center"><tr><th>No</th><th>Kode</th><th>Nama</th><th>Resor</th><th>Action</th></tr></thead>
-                        <tbody>
-                            @forelse ($gardus as $g)
-                                <tr>
-                                    <td class="text-center">{{ $gardus->firstItem() + $loop->index }}</td>
-                                    <td>{{ $g->kode }}</td>
-                                    <td>{{ $g->nama }}</td>
-                                    <td>{{ $g->resor?->nama ?? '-' }}</td>
-                                    <td><div class="d-flex gap-1 justify-content-center"><button class="btn btn-warning btn-icon btn-sm" data-bs-toggle="modal" data-bs-target="#editGardu{{ $g->id }}" title="Edit"><i class="fas fa-pen"></i></button><form method="POST" action="{{ route('input.gardu.destroy', $g->id) }}" onsubmit="return confirm('Hapus data ini?')">@csrf @method('DELETE')<button class="btn btn-danger btn-icon btn-sm" title="Delete"><i class="fas fa-trash"></i></button></form></div></td>
-                                </tr>
-                            @empty
-                                <tr><td colspan="5" class="text-center text-muted">Tidak ada data</td></tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                    {{ $gardus->links() }}
-                </div>
-            </div>
-        </div>
-
-        <div class="col-lg-6">
-            <div class="card h-100">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Charger</h5>
-                    <button class="btn btn-primary btn-icon btn-sm" data-bs-toggle="modal" data-bs-target="#createChargerModal" title="Tambah Charger"><i class="fas fa-plus"></i></button>
-                </div>
-                <div class="card-body table-responsive">
-                    <table class="table table-bordered table-sm align-middle">
-                        <thead class="table-dark text-center"><tr><th>No</th><th>Serial No</th><th>Merk</th><th>Kapasitas</th><th>Status</th><th>Gardu</th><th>Action</th></tr></thead>
-                        <tbody>
-                            @forelse ($chargers as $c)
-                                <tr>
-                                    <td class="text-center">{{ $chargers->firstItem() + $loop->index }}</td>
-                                    <td>{{ $c->serial_no }}</td>
-                                    <td>{{ $c->merk }}</td>
-                                    <td class="text-center">{{ $c->kapasitas }}</td>
-                                    <td class="text-center">{{ $c->status }}</td>
-                                    <td>{{ $c->gardu?->nama ?? '-' }}</td>
-                                    <td><div class="d-flex gap-1 justify-content-center"><button class="btn btn-warning btn-icon btn-sm" data-bs-toggle="modal" data-bs-target="#editCharger{{ $c->id }}" title="Edit"><i class="fas fa-pen"></i></button><form method="POST" action="{{ route('input.charger.destroy', $c->id) }}" onsubmit="return confirm('Hapus data ini?')">@csrf @method('DELETE')<button class="btn btn-danger btn-icon btn-sm" title="Delete"><i class="fas fa-trash"></i></button></form></div></td>
-                                </tr>
-                            @empty
-                                <tr><td colspan="7" class="text-center text-muted">Tidak ada data</td></tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                    {{ $chargers->links() }}
-                </div>
-            </div>
-        </div>
-
-        <div class="col-lg-6">
-            <div class="card h-100">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Battery</h5>
-                    <button class="btn btn-primary btn-icon btn-sm" data-bs-toggle="modal" data-bs-target="#createBatteryModal" title="Tambah Battery"><i class="fas fa-plus"></i></button>
-                </div>
-                <div class="card-body table-responsive">
-                    <table class="table table-bordered table-sm align-middle">
-                        <thead class="table-dark text-center"><tr><th>No</th><th>Serial No</th><th>Merk</th><th>Kapasitas</th><th>Status</th><th>Gardu</th><th>Action</th></tr></thead>
-                        <tbody>
-                            @forelse ($batteries as $b)
-                                <tr>
-                                    <td class="text-center">{{ $batteries->firstItem() + $loop->index }}</td>
-                                    <td>{{ $b->serial_no }}</td>
-                                    <td>{{ $b->merk }}</td>
-                                    <td class="text-center">{{ $b->kapasitas }}</td>
-                                    <td class="text-center">{{ $b->status }}</td>
-                                    <td>{{ $b->gardu?->nama ?? '-' }}</td>
-                                    <td><div class="d-flex gap-1 justify-content-center"><button class="btn btn-warning btn-icon btn-sm" data-bs-toggle="modal" data-bs-target="#editBattery{{ $b->id }}" title="Edit"><i class="fas fa-pen"></i></button><form method="POST" action="{{ route('input.battery.destroy', $b->id) }}" onsubmit="return confirm('Hapus data ini?')">@csrf @method('DELETE')<button class="btn btn-danger btn-icon btn-sm" title="Delete"><i class="fas fa-trash"></i></button></form></div></td>
-                                </tr>
-                            @empty
-                                <tr><td colspan="7" class="text-center text-muted">Tidak ada data</td></tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                    {{ $batteries->links() }}
-                </div>
-            </div>
+            </form>
         </div>
     </div>
+
+    @if ($activeSection === 'users')
+        <div class="card input-section-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Users</h5>
+                <button class="btn btn-primary btn-icon btn-sm" data-bs-toggle="modal" data-bs-target="#createUserModal" title="Tambah User"><i class="fas fa-plus"></i></button>
+            </div>
+            <div class="card-body table-responsive">
+                <table class="table table-bordered table-sm align-middle">
+                    <thead class="table-dark text-center"><tr><th>No</th><th>ID</th><th>Username</th><th>Email</th><th>Role</th><th>Action</th></tr></thead>
+                    <tbody>
+                        @forelse ($users as $u)
+                            <tr>
+                                <td class="text-center">{{ $users->firstItem() + $loop->index }}</td>
+                                <td class="text-center">{{ $u->id }}</td>
+                                <td>{{ $u->username }}</td>
+                                <td>{{ $u->email }}</td>
+                                <td class="text-center">{{ $u->role }}</td>
+                                <td>
+                                    <div class="d-flex gap-1 justify-content-center">
+                                        <button class="btn btn-warning btn-icon btn-sm" data-bs-toggle="modal" data-bs-target="#editUser{{ $u->id }}" title="Edit"><i class="fas fa-pen"></i></button>
+                                        <form method="POST" action="{{ route('input.users.destroy', $u->id) }}" onsubmit="return confirm('Hapus data ini?')">@csrf @method('DELETE')<button class="btn btn-danger btn-icon btn-sm" title="Delete"><i class="fas fa-trash"></i></button></form>
+                                    </div>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="6" class="text-center text-muted">Tidak ada data</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+                {{ $users->appends(['section' => 'users'])->links() }}
+            </div>
+        </div>
+    @elseif ($activeSection === 'daops')
+        <div class="card input-section-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Daop</h5>
+                <button class="btn btn-primary btn-icon btn-sm" data-bs-toggle="modal" data-bs-target="#createDaopModal" title="Tambah Daop"><i class="fas fa-plus"></i></button>
+            </div>
+            <div class="card-body table-responsive">
+                <table class="table table-bordered table-sm align-middle">
+                    <thead class="table-dark text-center"><tr><th>No</th><th>ID</th><th>Nama</th><th>Wilayah</th><th>Action</th></tr></thead>
+                    <tbody>
+                        @forelse ($daops as $d)
+                            <tr>
+                                <td class="text-center">{{ $daops->firstItem() + $loop->index }}</td>
+                                <td class="text-center">{{ $d->id }}</td>
+                                <td>{{ $d->nama }}</td>
+                                <td>{{ $d->wilayah }}</td>
+                                <td>
+                                    <div class="d-flex gap-1 justify-content-center">
+                                        <button class="btn btn-warning btn-icon btn-sm" data-bs-toggle="modal" data-bs-target="#editDaop{{ $d->id }}" title="Edit"><i class="fas fa-pen"></i></button>
+                                        <form method="POST" action="{{ route('input.daop.destroy', $d->id) }}" onsubmit="return confirm('Hapus data ini?')">@csrf @method('DELETE')<button class="btn btn-danger btn-icon btn-sm" title="Delete"><i class="fas fa-trash"></i></button></form>
+                                    </div>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="5" class="text-center text-muted">Tidak ada data</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+                {{ $daops->appends(['section' => 'daops'])->links() }}
+            </div>
+        </div>
+    @elseif ($activeSection === 'resors')
+        <div class="card input-section-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Resor</h5>
+                <button class="btn btn-primary btn-icon btn-sm" data-bs-toggle="modal" data-bs-target="#createResorModal" title="Tambah Resor"><i class="fas fa-plus"></i></button>
+            </div>
+            <div class="card-body table-responsive">
+                <table class="table table-bordered table-sm align-middle">
+                    <thead class="table-dark text-center"><tr><th>No</th><th>ID</th><th>Nama</th><th>Daop</th><th>Alamat</th><th>n_asset</th><th>Action</th></tr></thead>
+                    <tbody>
+                        @forelse ($resors as $r)
+                            <tr>
+                                <td class="text-center">{{ $resors->firstItem() + $loop->index }}</td>
+                                <td class="text-center">{{ $r->id }}</td>
+                                <td>{{ $r->nama }}</td>
+                                <td>{{ $r->daop?->nama ?? '-' }}</td>
+                                <td>{{ $r->alamat }}</td>
+                                <td class="text-center">{{ $r->n_asset }}</td>
+                                <td><div class="d-flex gap-1 justify-content-center"><button class="btn btn-warning btn-icon btn-sm" data-bs-toggle="modal" data-bs-target="#editResor{{ $r->id }}" title="Edit"><i class="fas fa-pen"></i></button><form method="POST" action="{{ route('input.resor.destroy', $r->id) }}" onsubmit="return confirm('Hapus data ini?')">@csrf @method('DELETE')<button class="btn btn-danger btn-icon btn-sm" title="Delete"><i class="fas fa-trash"></i></button></form></div></td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="7" class="text-center text-muted">Tidak ada data</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+                {{ $resors->appends(['section' => 'resors'])->links() }}
+            </div>
+        </div>
+    @elseif ($activeSection === 'gardus')
+        <div class="card input-section-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Gardu</h5>
+                <button class="btn btn-primary btn-icon btn-sm" data-bs-toggle="modal" data-bs-target="#createGarduModal" title="Tambah Gardu"><i class="fas fa-plus"></i></button>
+            </div>
+            <div class="card-body table-responsive">
+                <table class="table table-bordered table-sm align-middle">
+                    <thead class="table-dark text-center"><tr><th>No</th><th>ID</th><th>Kode</th><th>Nama</th><th>n_bank</th><th>n_batt</th><th>Resor</th><th>Latitude</th><th>Longitude</th><th>Address</th><th>Action</th></tr></thead>
+                    <tbody>
+                        @forelse ($gardus as $g)
+                            <tr>
+                                <td class="text-center">{{ $gardus->firstItem() + $loop->index }}</td>
+                                <td class="text-center">{{ $g->id }}</td>
+                                <td>{{ $g->kode }}</td>
+                                <td>{{ $g->nama }}</td>
+                                <td class="text-center">{{ $g->n_bank }}</td>
+                                <td class="text-center">{{ $g->n_batt }}</td>
+                                <td>{{ $g->resor?->nama ?? '-' }}</td>
+                                <td>{{ $g->latitude }}</td>
+                                <td>{{ $g->longitude }}</td>
+                                <td>{{ $g->address }}</td>
+                                <td><div class="d-flex gap-1 justify-content-center"><button class="btn btn-warning btn-icon btn-sm" data-bs-toggle="modal" data-bs-target="#editGardu{{ $g->id }}" title="Edit"><i class="fas fa-pen"></i></button><form method="POST" action="{{ route('input.gardu.destroy', $g->id) }}" onsubmit="return confirm('Hapus data ini?')">@csrf @method('DELETE')<button class="btn btn-danger btn-icon btn-sm" title="Delete"><i class="fas fa-trash"></i></button></form></div></td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="11" class="text-center text-muted">Tidak ada data</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+                {{ $gardus->appends(['section' => 'gardus'])->links() }}
+            </div>
+        </div>
+    @elseif ($activeSection === 'chargers')
+        <div class="card input-section-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Charger</h5>
+                <button class="btn btn-primary btn-icon btn-sm" data-bs-toggle="modal" data-bs-target="#createChargerModal" title="Tambah Charger"><i class="fas fa-plus"></i></button>
+            </div>
+            <div class="card-body table-responsive">
+                <table class="table table-bordered table-sm align-middle">
+                    <thead class="table-dark text-center"><tr><th>No</th><th>ID</th><th>Serial No</th><th>Merk</th><th>Kapasitas</th><th>Pemasangan</th><th>Status</th><th>Gardu</th><th>Action</th></tr></thead>
+                    <tbody>
+                        @forelse ($chargers as $c)
+                            <tr>
+                                <td class="text-center">{{ $chargers->firstItem() + $loop->index }}</td>
+                                <td class="text-center">{{ $c->id }}</td>
+                                <td>{{ $c->serial_no }}</td>
+                                <td>{{ $c->merk }}</td>
+                                <td class="text-center">{{ $c->kapasitas }}</td>
+                                <td class="text-center">{{ $c->pemasangan }}</td>
+                                <td class="text-center">{{ $c->status }}</td>
+                                <td>{{ $c->gardu?->nama ?? '-' }}</td>
+                                <td><div class="d-flex gap-1 justify-content-center"><button class="btn btn-warning btn-icon btn-sm" data-bs-toggle="modal" data-bs-target="#editCharger{{ $c->id }}" title="Edit"><i class="fas fa-pen"></i></button><form method="POST" action="{{ route('input.charger.destroy', $c->id) }}" onsubmit="return confirm('Hapus data ini?')">@csrf @method('DELETE')<button class="btn btn-danger btn-icon btn-sm" title="Delete"><i class="fas fa-trash"></i></button></form></div></td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="9" class="text-center text-muted">Tidak ada data</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+                {{ $chargers->appends(['section' => 'chargers'])->links() }}
+            </div>
+        </div>
+    @elseif ($activeSection === 'batteries')
+        <div class="card input-section-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Battery</h5>
+                <button class="btn btn-primary btn-icon btn-sm" data-bs-toggle="modal" data-bs-target="#createBatteryModal" title="Tambah Battery"><i class="fas fa-plus"></i></button>
+            </div>
+            <div class="card-body table-responsive">
+                <table class="table table-bordered table-sm align-middle">
+                    <thead class="table-dark text-center"><tr><th>No</th><th>ID</th><th>Serial No</th><th>Merk</th><th>Kapasitas</th><th>Pemasangan</th><th>Status</th><th>Gardu</th><th>Action</th></tr></thead>
+                    <tbody>
+                        @forelse ($batteries as $b)
+                            <tr>
+                                <td class="text-center">{{ $batteries->firstItem() + $loop->index }}</td>
+                                <td class="text-center">{{ $b->id }}</td>
+                                <td>{{ $b->serial_no }}</td>
+                                <td>{{ $b->merk }}</td>
+                                <td class="text-center">{{ $b->kapasitas }}</td>
+                                <td class="text-center">{{ $b->pemasangan }}</td>
+                                <td class="text-center">{{ $b->status }}</td>
+                                <td>{{ $b->gardu?->nama ?? '-' }}</td>
+                                <td><div class="d-flex gap-1 justify-content-center"><button class="btn btn-warning btn-icon btn-sm" data-bs-toggle="modal" data-bs-target="#editBattery{{ $b->id }}" title="Edit"><i class="fas fa-pen"></i></button><form method="POST" action="{{ route('input.battery.destroy', $b->id) }}" onsubmit="return confirm('Hapus data ini?')">@csrf @method('DELETE')<button class="btn btn-danger btn-icon btn-sm" title="Delete"><i class="fas fa-trash"></i></button></form></div></td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="9" class="text-center text-muted">Tidak ada data</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+                {{ $batteries->appends(['section' => 'batteries'])->links() }}
+            </div>
+        </div>
+    @endif
 </div>
 @foreach($users as $u)
 <div class="modal fade" id="editUser{{ $u->id }}" tabindex="-1"><div class="modal-dialog"><form method="POST" action="{{ route('input.users.update', $u->id) }}" class="modal-content">@csrf @method('PATCH')<div class="modal-header"><h5 class="modal-title">Edit User</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body row g-2"><div class="col-md-6"><label class="form-label">Username</label><input name="username" class="form-control" value="{{ $u->username }}" required></div><div class="col-md-6"><label class="form-label">Email</label><input type="email" name="email" class="form-control" value="{{ $u->email }}" required></div><div class="col-md-6"><label class="form-label">Password</label><input type="password" name="password" class="form-control" placeholder="Kosongkan jika tidak diubah"></div><div class="col-md-6"><label class="form-label">Role</label><select name="role" class="form-select" required><option value="admin" @selected($u->role === 'admin')>admin</option><option value="operator" @selected($u->role === 'operator')>operator</option><option value="viewer" @selected($u->role === 'viewer')>viewer</option></select></div></div><div class="modal-footer"><button class="btn btn-primary">Simpan</button></div></form></div></div>
