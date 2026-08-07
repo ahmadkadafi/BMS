@@ -84,7 +84,7 @@
                     ->sortByDesc('measured_at')
                     ->first();
 
-                $labels[] = 'Battery '.($i+1);
+                $labels[] = 'Batt '.($i+1);
                 $volt[] = $last->volt ?? 0;
                 $temp[] = $last->temp ?? 0;
                 $thd[]  = $last->thd ?? 0;
