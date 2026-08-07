@@ -1,6 +1,6 @@
 ﻿@extends('layouts.master')
 
-@section('title', 'Report - '.$resor->nama)
+@section('title', 'Report - '.($resor?->nama ?? 'Semua Data'))
 
 @section('content')
 <div class="page-inner">

@@ -1,6 +1,6 @@
 @extends('layouts.master')
 
-@section('title', 'Charger Setting - '.$resor->nama)
+@section('title', 'Charger Setting - '.($resor?->nama ?? 'Semua Data'))
 
 @section('content')
 <div class="page-inner">

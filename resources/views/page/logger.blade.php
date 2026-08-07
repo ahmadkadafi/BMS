@@ -1,6 +1,6 @@
 @extends('layouts.master')
 
-@section('title', 'Logger - '.$resor->nama)
+@section('title', 'Logger - '.($resor?->nama ?? 'Semua Data'))
 
 @section('content')
 <div class="page-inner">
@@ -101,7 +101,7 @@
                                 </td>
                                 <td class="text-center">
                                     @if ($log->action === 'coming')
-                                        <form action="{{ route('logger.submit', ['resor' => $resor->id, 'logger' => $log->id]) }}" method="POST">
+                                        <form action="{{ route('logger.submit', ['resor' => $resor?->id ?? $log->resor_id, 'logger' => $log->id]) }}" method="POST">
                                             @csrf
                                             @method('PATCH')
                                             <button type="submit" class="btn btn-sm {{ $log->status === 'alarm' ? 'btn-danger' : 'btn-warning text-dark' }}">

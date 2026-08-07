@@ -9,11 +9,10 @@ use Illuminate\Http\Request;
 
 class BatterySettingController extends Controller
 {
-    public function index($resorId)
+    public function index(?Resor $resor = null)
     {
-        $resor = Resor::findOrFail($resorId);
-
-        $gardu = Gardu::where('resor_id', $resorId)
+        $gardu = Gardu::query()
+            ->when($resor, fn ($q) => $q->where('resor_id', $resor->id))
             ->with('batterySetting')
             ->orderBy('id')
             ->get();

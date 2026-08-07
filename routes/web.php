@@ -48,6 +48,14 @@ Route::post('/logout', [LoginController::class, 'logout'])
 
 Route::middleware(['auth.session', 'admin.only'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'dashboard'])->name('dashboard');
+    Route::get('/monitoring', [MonitoringController::class, 'index'])->name('monitoring.all');
+    Route::get('/graphic', [GraphicController::class, 'index'])->name('graphic.all');
+    Route::get('/line', [LineController::class, 'index'])->name('line.all');
+    Route::get('/table', [TableController::class, 'index'])->name('table.all');
+    Route::get('/logger', [LoggerController::class, 'index'])->name('logger.all');
+    Route::get('/report/all', [ReportController::class, 'index'])->name('report.all');
+    Route::get('/batterysetting', [BatterySettingController::class, 'index'])->name('batterysetting.all');
+    Route::get('/chargersetting', [ChargerSettingController::class, 'index'])->name('chargersetting.all');
 });
 
 Route::middleware(['auth.session', 'resor.access'])->group(function () {

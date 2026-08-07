@@ -1,6 +1,6 @@
 @extends('layouts.master')
 
-@section('title', 'Line - '.$resor->nama)
+@section('title', 'Line - '.($resor?->nama ?? 'Semua Data'))
 
 @section('content')
 @php

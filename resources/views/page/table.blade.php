@@ -1,6 +1,6 @@
 @extends('layouts.master')
 
-@section('title', 'Table - '.$resor->nama)
+@section('title', 'Table - '.($resor?->nama ?? 'Semua Data'))
 
 @section('content')
 @php
@@ -46,6 +46,7 @@
                 <div class="col-md-2">
                     <label class="form-label fw-bold"><i class="fas fa-map-marker-alt text-primary mr-1"></i> Lokasi Gardu</label>
                     <select name="gardu_id" class="form-select">
+                        <option value="" {{ empty($selectedGarduId) ? 'selected' : '' }}>-- Semua Gardu --</option>
                         @foreach ($gardu as $g)
                             <option value="{{ $g->id }}" {{ (int) $selectedGarduId === (int) $g->id ? 'selected' : '' }}>
                                 {{ $g->nama }}

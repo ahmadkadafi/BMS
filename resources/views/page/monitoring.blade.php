@@ -1,6 +1,6 @@
 @extends('layouts.master')
 
-@section('title', 'Monitoring - '.$resor->nama)
+@section('title', 'Monitoring - '.($resor?->nama ?? 'Semua Data'))
 
 @section('content')
 <style>

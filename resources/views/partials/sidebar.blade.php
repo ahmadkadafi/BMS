@@ -29,22 +29,15 @@
         <div class="sidebar-content">
         @php
             $authUser = session('auth_user', []);
+            $isAdmin = ($authUser['role'] ?? null) === 'admin';
             $isRangkasOnly = strcasecmp(trim((string) ($authUser['username'] ?? '')), 'LAA 1.1 RK') === 0;
             $defaultResorId = $resors->first()?->id;
-            $aiPredictionUrl = ($authUser['role'] ?? null) === 'admin'
+            $aiPredictionUrl = $isAdmin
                 ? route('dashboard')
                 : ($defaultResorId ? route('dashboard.resor', ['resor' => $defaultResorId]) : '#');
         @endphp
         <ul class="nav nav-secondary">
             @if (! $isRangkasOnly)
-            @if (($authUser['role'] ?? null) === 'admin')
-            <li class="nav-item">
-                <a href="{{ route('dashboard') }}">
-                    <i class="fas fa-home"></i>
-                    <p>Dashboard Total</p>
-                </a>
-            </li>
-            @endif
             <li class="nav-item">
                 <a data-bs-toggle="collapse" href="#dashboardResor">
                     <i class="fas fa-building"></i>
@@ -53,6 +46,13 @@
                 </a>
                 <div class="collapse" id="dashboardResor">
                     <ul class="nav nav-collapse">
+                        @if ($isAdmin)
+                            <li>
+                                <a href="{{ route('dashboard') }}">
+                                    <span class="sub-item">Semua Data</span>
+                                </a>
+                            </li>
+                        @endif
                         @foreach ($resors as $resor)
                             <li>
                                 <a href="{{ route('dashboard.resor', ['resor' => $resor->id]) }}">
@@ -78,6 +78,13 @@
                 </a>
                 <div class="collapse" id="monitoring">
                     <ul class="nav nav-collapse">
+                        @if ($isAdmin)
+                            <li>
+                                <a href="{{ route('monitoring.all') }}">
+                                    <span class="sub-item">Semua Data</span>
+                                </a>
+                            </li>
+                        @endif
                         @foreach ($resors as $resor)
                             <li>
                                 <a href="{{ url('/monitoring/resor/'.$resor->id) }}">
@@ -96,6 +103,13 @@
                 </a>
                 <div class="collapse" id="graphic">
                     <ul class="nav nav-collapse">
+                        @if ($isAdmin)
+                            <li>
+                                <a href="{{ route('graphic.all') }}">
+                                    <span class="sub-item">Semua Data</span>
+                                </a>
+                            </li>
+                        @endif
                         @foreach ($resors as $resor)
                             <li>
                                 <a href="{{ url('/graphic/resor/'.$resor->id) }}">
@@ -114,6 +128,13 @@
                 </a>
                 <div class="collapse" id="line">
                     <ul class="nav nav-collapse">
+                        @if ($isAdmin)
+                            <li>
+                                <a href="{{ route('line.all') }}">
+                                    <span class="sub-item">Semua Data</span>
+                                </a>
+                            </li>
+                        @endif
                         @foreach ($resors as $resor)
                             <li>
                                 <a href="{{ url('/line/resor/'.$resor->id) }}">
@@ -132,6 +153,13 @@
                 </a>
                 <div class="collapse" id="table">
                     <ul class="nav nav-collapse">
+                        @if ($isAdmin)
+                            <li>
+                                <a href="{{ route('table.all') }}">
+                                    <span class="sub-item">Semua Data</span>
+                                </a>
+                            </li>
+                        @endif
                         @foreach ($resors as $resor)
                             <li>
                                 <a href="{{ url('/table/resor/'.$resor->id) }}">
@@ -150,6 +178,13 @@
             </a>
             <div class="collapse" id="logger">
                 <ul class="nav nav-collapse">
+                    @if ($isAdmin)
+                        <li>
+                            <a href="{{ route('logger.all') }}">
+                                <span class="sub-item">Semua Data</span>
+                            </a>
+                        </li>
+                    @endif
                     @foreach ($resors as $resor)
                         <li>
                             <a href="{{ url('/logger/resor/'.$resor->id) }}">
@@ -168,6 +203,13 @@
             </a>
             <div class="collapse" id="report">
                 <ul class="nav nav-collapse">
+                    @if ($isAdmin)
+                        <li>
+                            <a href="{{ route('report.all') }}">
+                                <span class="sub-item">Semua Data</span>
+                            </a>
+                        </li>
+                    @endif
                     @foreach ($resors as $resor)
                         <li>
                             <a href="{{ url('/report/resor/'.$resor->id) }}">
@@ -186,6 +228,13 @@
             </a>
             <div class="collapse" id="batterysetting">
                 <ul class="nav nav-collapse">
+                    @if ($isAdmin)
+                        <li>
+                            <a href="{{ route('batterysetting.all') }}">
+                                <span class="sub-item">Semua Data</span>
+                            </a>
+                        </li>
+                    @endif
                     @foreach ($resors as $resor)
                         <li>
                             <a href="{{ url('/batterysetting/resor/'.$resor->id) }}">
@@ -204,6 +253,13 @@
             </a>
             <div class="collapse" id="chargersetting">
                 <ul class="nav nav-collapse">
+                    @if ($isAdmin)
+                        <li>
+                            <a href="{{ route('chargersetting.all') }}">
+                                <span class="sub-item">Semua Data</span>
+                            </a>
+                        </li>
+                    @endif
                     @foreach ($resors as $resor)
                         <li>
                             <a href="{{ url('/chargersetting/resor/'.$resor->id) }}">
@@ -215,7 +271,7 @@
             </div>
             </li>
             @if (! $isRangkasOnly)
-            @if (($authUser['role'] ?? null) === 'admin')
+            @if ($isAdmin)
             <li class="nav-item">
             <a href="{{ route('input.index') }}">
                 <i class="fas fa-database"></i>

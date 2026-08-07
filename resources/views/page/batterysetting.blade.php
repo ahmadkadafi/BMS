@@ -1,6 +1,6 @@
 @extends('layouts.master')
 
-@section('title', 'Battery Setting - '.$resor->nama)
+@section('title', 'Battery Setting - '.($resor?->nama ?? 'Semua Data'))
 
 @section('content')
 <div class="page-inner">

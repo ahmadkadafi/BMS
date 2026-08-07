@@ -8,10 +8,11 @@ use App\Models\Gardu;
 
 class MonitoringController extends Controller
 {
-    public function index(Resor $resor)
+    public function index(?Resor $resor = null)
     {
         // Ambil semua gardu di resor
-        $gardu = Gardu::where('resor_id', $resor->id)
+        $gardu = Gardu::query()
+            ->when($resor, fn ($q) => $q->where('resor_id', $resor->id))
             ->with(['batteries' => function ($q) {
                 $q->with(['monitorings' => function ($qm) {
                     $qm->latest('measured_at')->limit(1);

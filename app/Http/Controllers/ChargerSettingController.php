@@ -9,12 +9,12 @@ use Illuminate\Http\Request;
 
 class ChargerSettingController extends Controller
 {
-    public function index($resorId)
+    public function index(?Resor $resor = null)
     {
-        $resor = Resor::findOrFail($resorId);
-
         $chargers = Charger::query()
-            ->whereHas('gardu', fn ($q) => $q->where('resor_id', $resorId))
+            ->when($resor, fn ($q) =>
+                $q->whereHas('gardu', fn ($gq) => $gq->where('resor_id', $resor->id))
+            )
             ->with(['gardu:id,nama', 'chargerSetting'])
             ->orderBy('id')
             ->get();

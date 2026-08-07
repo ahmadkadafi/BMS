@@ -11,9 +11,10 @@ use Illuminate\Support\Facades\DB;
 
 class GraphicController extends Controller
 {
-    public function index(Request $request, Resor $resor)
+    public function index(Request $request, ?Resor $resor = null)
     {
-        $gardu = Gardu::where('resor_id', $resor->id)
+        $gardu = Gardu::query()
+            ->when($resor, fn ($q) => $q->where('resor_id', $resor->id))
             ->with(['batteries:id,gardu_id', 'chargers:id,gardu_id'])
             ->orderBy('nama')
             ->get();

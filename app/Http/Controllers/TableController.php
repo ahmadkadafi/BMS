@@ -14,21 +14,21 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TableController extends Controller
 {
-    public function index(Request $request, Resor $resor)
+    public function index(Request $request, ?Resor $resor = null)
     {
-        $gardu = Gardu::where('resor_id', $resor->id)
+        $gardu = Gardu::query()
+            ->when($resor, fn ($q) => $q->where('resor_id', $resor->id))
             ->with(['batteries:id,gardu_id', 'chargers:id,gardu_id'])
             ->orderBy('id')
             ->get();
 
-        $defaultGarduId = $gardu->min('id');
         $selectedGarduId = $request->filled('gardu_id')
             ? (int) $request->gardu_id
-            : $defaultGarduId;
+            : ($gardu->contains('id', 1) ? 1 : $gardu->min('id'));
 
         $garduData = $selectedGarduId
             ? $gardu->where('id', $selectedGarduId)->values()
-            : collect();
+            : $gardu;
 
         $garduIds = $garduData->pluck('id');
         $maxBatt = $garduData->max(fn ($g) => $g->batteries->count()) ?? 0;
@@ -134,7 +134,7 @@ class TableController extends Controller
         return $allRows;
     }
 
-    private function exportCsv(Resor $resor, $rows, string $selectedTable, int $maxBatt): StreamedResponse
+    private function exportCsv(?Resor $resor, $rows, string $selectedTable, int $maxBatt): StreamedResponse
     {
         $columns = ['No', 'Date', 'Time'];
         if ($selectedTable === 'charger') {
@@ -149,7 +149,7 @@ class TableController extends Controller
 
         $filename = sprintf(
             'table-%s-%s.csv',
-            $resor->id,
+            $resor?->id ?? 'all',
             now()->format('Ymd-His')
         );
 

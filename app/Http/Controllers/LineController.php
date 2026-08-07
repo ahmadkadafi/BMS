@@ -11,18 +11,19 @@ use Illuminate\Http\Request;
 
 class LineController extends Controller
 {
-    public function index(Request $request, Resor $resor)
+    public function index(Request $request, ?Resor $resor = null)
     {
         $appNow = now(config('app.timezone'));
 
-        $gardu = $resor->gardu()
+        $gardu = Gardu::query()
+            ->when($resor, fn ($q) => $q->where('resor_id', $resor->id))
             ->with(['batteries:id,gardu_id', 'chargers:id,gardu_id'])
             ->orderBy('id')
             ->get();
 
         $selectedGarduId = $request->filled('gardu_id')
             ? (int) $request->gardu_id
-            : $gardu->min('id');
+            : ($gardu->contains('id', 1) ? 1 : $gardu->min('id'));
 
         $selectedChart = $request->input('chart', 'volt');
         $toDate = $request->input('to', $appNow->toDateString());

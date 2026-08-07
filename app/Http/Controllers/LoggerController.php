@@ -10,15 +10,15 @@ use Illuminate\Http\Request;
 
 class LoggerController extends Controller
 {
-    public function index(Request $request, Resor $resor)
+    public function index(Request $request, ?Resor $resor = null)
     {
         $garduOptions = Gardu::query()
-            ->where('resor_id', $resor->id)
+            ->when($resor, fn ($q) => $q->where('resor_id', $resor->id))
             ->orderBy('nama')
             ->get(['id', 'nama']);
 
         $logs = Logger::query()
-            ->where('resor_id', $resor->id)
+            ->when($resor, fn ($q) => $q->where('resor_id', $resor->id))
             ->whereIn('status', ['warning', 'alarm'])
             ->when($request->filled('gardu_id'), fn ($q) => $q->where('gardu_id', $request->gardu_id))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))

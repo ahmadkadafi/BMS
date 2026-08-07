@@ -27,14 +27,14 @@ class ReportController extends Controller
         return redirect()->route('report.resor', ['resor' => $targetResorId]);
     }
 
-    public function index(Request $request, Resor $resor): View
+    public function index(Request $request, ?Resor $resor = null): View
     {
         $month = max(1, min(12, (int) $request->input('month', now()->month)));
         $year = max(2000, min(2100, (int) $request->input('year', now()->year)));
         $referenceDate = Carbon::create($year, $month, 1)->endOfMonth();
 
         $gardus = Gardu::query()
-            ->where('resor_id', $resor->id)
+            ->when($resor, fn ($q) => $q->where('resor_id', $resor->id))
             ->with(['batteries:id,serial_no,pemasangan,gardu_id', 'chargers:id,gardu_id'])
             ->orderBy('nama')
             ->get();
