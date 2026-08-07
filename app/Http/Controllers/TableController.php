@@ -92,6 +92,7 @@ class TableController extends Controller
             ->select('measured_at')
             ->distinct()
             ->orderByDesc('measured_at')
+            ->limit(500)
             ->get();
 
         $allRows = collect();
