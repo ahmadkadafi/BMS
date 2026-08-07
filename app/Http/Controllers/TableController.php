@@ -95,29 +95,38 @@ class TableController extends Controller
             ->limit(500)
             ->get();
 
+        $timeValues = $snapshotTimes->pluck('measured_at')->all();
+        $batteryRowsByTime = BatteryMonitoring::with(['battery:id,gardu_id'])
+            ->whereIn('measured_at', $timeValues)
+            ->whereHas('battery', fn ($q) => $q->whereIn('gardu_id', $garduIds))
+            ->orderBy('battery_id')
+            ->get()
+            ->groupBy([
+                fn ($row) => (string) $row->measured_at,
+                fn ($row) => optional($row->battery)->gardu_id,
+            ]);
+
+        $chargerRowsByTime = ChargerMonitoring::with(['charger:id,gardu_id'])
+            ->whereIn('measured_at', $timeValues)
+            ->whereHas('charger', fn ($q) => $q->whereIn('gardu_id', $garduIds))
+            ->orderBy('charger_id')
+            ->get()
+            ->groupBy([
+                fn ($row) => (string) $row->measured_at,
+                fn ($row) => optional($row->charger)->gardu_id,
+            ]);
+
         $allRows = collect();
 
         foreach ($snapshotTimes as $time) {
-            $batteryRows = BatteryMonitoring::with(['battery:id,gardu_id'])
-                ->where('measured_at', $time->measured_at)
-                ->whereHas('battery', fn ($q) => $q->whereIn('gardu_id', $garduIds))
-                ->orderBy('battery_id')
-                ->get()
-                ->groupBy(fn ($row) => optional($row->battery)->gardu_id);
-
-            $chargerRows = ChargerMonitoring::with(['charger:id,gardu_id'])
-                ->where('measured_at', $time->measured_at)
-                ->whereHas('charger', fn ($q) => $q->whereIn('gardu_id', $garduIds))
-                ->orderBy('charger_id')
-                ->get()
-                ->groupBy(fn ($row) => optional($row->charger)->gardu_id);
+            $timeKey = (string) $time->measured_at;
 
             foreach ($garduData as $g) {
                 $allRows->push([
                     'time' => $time->measured_at,
                     'gardu' => $g->nama,
-                    'batteries' => ($batteryRows->get($g->id) ?? collect())->values(),
-                    'chargers' => ($chargerRows->get($g->id) ?? collect())->values(),
+                    'batteries' => $batteryRowsByTime->get($timeKey, collect())->get($g->id, collect())->values(),
+                    'chargers' => $chargerRowsByTime->get($timeKey, collect())->get($g->id, collect())->values(),
                 ]);
             }
         }
