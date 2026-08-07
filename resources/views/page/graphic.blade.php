@@ -13,7 +13,7 @@
         display: flex;
         align-items: center;
         gap: 10px;
-        flex-wrap: nowrap;
+        flex-wrap: wrap;
     }
     .filter-inline .form-label {
         margin-bottom: 0;
@@ -229,7 +229,12 @@
 
 <script>
 function barChart(id, labels, data, color) {
-    new Chart(document.getElementById(id), {
+    const canvas = document.getElementById(id);
+    if (!canvas) {
+        return;
+    }
+
+    new Chart(canvas, {
         type: 'bar',
         data: {
             labels: labels,
