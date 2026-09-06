@@ -3,12 +3,43 @@
 @section('title', 'Logger - '.($resor?->nama ?? 'Semua Data'))
 
 @section('content')
+<style>
+    .table-filter-card {
+        border: 0;
+        border-radius: 16px;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+    }
+    .table-data-card {
+        border: 0;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 10px 26px rgba(0, 0, 0, 0.08);
+    }
+    .table thead th {
+        white-space: nowrap;
+        font-size: 12px;
+    }
+    .table tbody td {
+        font-size: 12px;
+        white-space: nowrap;
+    }
+    .logger-table .btn-sm {
+        font-size: 11px;
+        padding: 3px 7px;
+    }
+    .logger-table .logger-message {
+        min-width: 220px;
+        max-width: 360px;
+        white-space: normal;
+    }
+</style>
+
 <div class="page-inner">
     @if (session('success'))
         <div class="alert alert-success">{{ session('success') }}</div>
     @endif
 
-    <div class="card mb-4">
+    <div class="card table-filter-card mb-4">
         <div class="card-body">
             <form method="GET">
                 <div class="row g-3 align-items-end">
@@ -63,23 +94,24 @@
         </div>
     </div>
 
-    <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0 fw-bold">Logger Warning & Alarm</h5>
-            <span class="badge bg-secondary">Total: {{ $logs->total() }}</span>
+    <div class="card table-data-card mb-4">
+        <div class="card-header fw-bold d-flex justify-content-between align-items-center">
+            <span><i class="fas fa-bell text-danger mr-1"></i> Logger Warning & Alarm</span>
+            <small class="text-muted">{{ $logs->total() }} data</small>
         </div>
 
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-bordered table-striped align-middle table-sm">
-                    <thead class="table-dark text-center align-middle">
+                <table class="table table-bordered table-sm text-center align-middle logger-table">
+                    <thead class="table-dark">
                         <tr>
                             <th>No</th>
                             <th>Tanggal</th>
-                            <th>Waktu Alarm</th>
+                            <th>Waktu</th>
                             <th>Status</th>
                             <th>Device Type</th>
-                            <th>Device</th>
+                            <th>Gardu</th>
+                            <th>Device Name</th>
                             <th>Duration</th>
                             <th>Alarm Type</th>
                             <th>Message</th>
@@ -111,11 +143,15 @@
                                 </td>
                                 <td class="text-center">{{ ucfirst($log->device_type) }}</td>
                                 <td class="text-center">
-                                    <div class="fw-semibold">{{ $log->gardu?->nama ?? '-' }}</div>
+                                    {{ $log->gardu?->nama ?? '-' }}
+                                </td>
+                                <td class="text-center">
                                     @if ($log->device_type === 'battery')
-                                        <div class="small text-muted">Battery: {{ $log->battery?->serial_no ?? $log->batt_id ?? '-' }}</div>
+                                        {{ $log->battery?->serial_no ?? $log->batt_id ?? '-' }}
                                     @elseif ($log->device_type === 'charger')
-                                        <div class="small text-muted">Charger: {{ $log->charger?->merk ?? $log->charger?->serial_no ?? $log->charger_id ?? '-' }}</div>
+                                        {{ $log->charger?->merk ?? $log->charger?->serial_no ?? $log->charger_id ?? '-' }}
+                                    @else
+                                        -
                                     @endif
                                 </td>
                                 <td class="text-center">{{ $log->duration_text ?? '-' }}</td>
@@ -123,11 +159,8 @@
                                     <span class="badge {{ $alarmBadge }}">
                                         {{ strtoupper($alarmType) }}
                                     </span>
-                                    @if ($log->alarm_code)
-                                        <div class="small text-muted">{{ ucwords(str_replace('_', ' ', $log->alarm_code)) }}</div>
-                                    @endif
                                 </td>
-                                <td>{{ $log->message }}</td>
+                                <td class="logger-message">{{ $log->message }}</td>
                                 <td class="text-center">
                                     @if ($lifecycleStatus === 'open')
                                         <div class="d-flex justify-content-center gap-1">
@@ -135,13 +168,17 @@
                                                 @csrf
                                                 @method('PATCH')
                                                 <input type="hidden" name="action" value="confirm">
-                                                <button type="submit" class="btn btn-sm btn-info text-dark">Confirm</button>
+                                                <button type="submit" class="btn btn-sm btn-info text-dark" title="Confirm">
+                                                    <i class="fas fa-check"></i>
+                                                </button>
                                             </form>
                                             <form action="{{ route('logger.submit', ['resor' => $resor?->id ?? $log->resor_id, 'logger' => $log->id]) }}" method="POST">
                                                 @csrf
                                                 @method('PATCH')
                                                 <input type="hidden" name="action" value="close">
-                                                <button type="submit" class="btn btn-sm btn-success">Close</button>
+                                                <button type="submit" class="btn btn-sm btn-success" title="Close">
+                                                    <i class="fas fa-lock"></i>
+                                                </button>
                                             </form>
                                         </div>
                                     @elseif ($lifecycleStatus === 'confirm')
@@ -149,10 +186,14 @@
                                             @csrf
                                             @method('PATCH')
                                             <input type="hidden" name="action" value="close">
-                                            <button type="submit" class="btn btn-sm btn-success">Close</button>
+                                            <button type="submit" class="btn btn-sm btn-success" title="Close">
+                                                <i class="fas fa-lock"></i>
+                                            </button>
                                         </form>
                                     @else
-                                        <span class="badge bg-success">Done</span>
+                                        <span class="badge bg-success" title="Closed">
+                                            <i class="fas fa-check-circle"></i>
+                                        </span>
                                     @endif
                                 </td>
                             </tr>
