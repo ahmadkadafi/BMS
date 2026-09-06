@@ -6,6 +6,7 @@ use App\Observers\BatteryMonitoringObserver;
 use App\Observers\ChargerMonitoringObserver;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -92,3 +93,56 @@ Artisan::command('logger:backfill {--device=all : all, battery, or charger} {--f
 
     return self::SUCCESS;
 })->purpose('Generate logger warning/alarm dari data monitoring yang sudah ada.');
+
+Artisan::command('logger:sync {--device=all : all, battery, or charger} {--minutes=10 : Process monitoring rows from the last N minutes} {--batch=100 : Rows processed per batch}', function () {
+    $device = $this->option('device');
+    $minutes = max(1, (int) $this->option('minutes'));
+    $batch = max(1, (int) $this->option('batch'));
+    $from = now()->subMinutes($minutes);
+
+    if (! in_array($device, ['all', 'battery', 'charger'], true)) {
+        $this->error('Option --device hanya menerima all, battery, atau charger.');
+
+        return self::FAILURE;
+    }
+
+    $processedBattery = 0;
+    $processedCharger = 0;
+    $runSync = function ($query, $observer, &$processed, string $label) use ($batch) {
+        $query->chunkById($batch, function ($monitorings) use ($observer, &$processed, $label) {
+            foreach ($monitorings as $monitoring) {
+                $observer->created($monitoring);
+                $processed++;
+            }
+
+            $this->info("{$label} sync diproses: {$processed}");
+        });
+    };
+
+    if (in_array($device, ['all', 'battery'], true)) {
+        $query = BatteryMonitoring::query()
+            ->with(['battery.gardu.resor', 'battery.gardu.batterySetting'])
+            ->where('measured_at', '>=', $from)
+            ->orderBy('id');
+
+        $runSync($query, app(BatteryMonitoringObserver::class), $processedBattery, 'battery');
+    }
+
+    if (in_array($device, ['all', 'charger'], true)) {
+        $query = ChargerMonitoring::query()
+            ->with(['charger.gardu.resor', 'charger.chargerSetting'])
+            ->where('measured_at', '>=', $from)
+            ->orderBy('id');
+
+        $runSync($query, app(ChargerMonitoringObserver::class), $processedCharger, 'charger');
+    }
+
+    $this->info("Battery monitoring sync: {$processedBattery}");
+    $this->info("Charger monitoring sync: {$processedCharger}");
+
+    return self::SUCCESS;
+})->purpose('Generate logger warning/alarm dari data monitoring terbaru untuk production.');
+
+Schedule::command('logger:sync --minutes=10 --batch=200')
+    ->everyMinute()
+    ->withoutOverlapping();
