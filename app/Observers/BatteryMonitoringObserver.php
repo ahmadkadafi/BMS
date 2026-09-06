@@ -9,7 +9,10 @@ class BatteryMonitoringObserver
 {
     public function created(BatteryMonitoring $monitoring): void
     {
-        $battery = $monitoring->battery()->with('gardu.resor', 'gardu.batterySetting')->first();
+        $battery = $monitoring->relationLoaded('battery')
+            ? $monitoring->battery
+            : $monitoring->battery()->with('gardu.resor', 'gardu.batterySetting')->first();
+
         if (! $battery || ! $battery->gardu || ! $battery->gardu->resor) {
             return;
         }
@@ -23,13 +26,13 @@ class BatteryMonitoringObserver
         }
 
         $checks = [
-            ['metric' => 'volt', 'warn' => 'volt_min_warn', 'alarm' => 'volt_min_alarm', 'label' => 'Voltage Min', 'unit' => 'V', 'mode' => 'min'],
-            ['metric' => 'volt', 'warn' => 'volt_max_warn', 'alarm' => 'volt_max_alarm', 'label' => 'Voltage Max', 'unit' => 'V', 'mode' => 'max'],
-            ['metric' => 'temp', 'warn' => 'temp_min_warn', 'alarm' => 'temp_min_alarm', 'label' => 'Temperature Min', 'unit' => 'C', 'mode' => 'min'],
-            ['metric' => 'temp', 'warn' => 'temp_max_warn', 'alarm' => 'temp_max_alarm', 'label' => 'Temperature Max', 'unit' => 'C', 'mode' => 'max'],
-            ['metric' => 'thd', 'warn' => 'thd_warn', 'alarm' => 'thd_alarm', 'label' => 'THD', 'unit' => '%', 'mode' => 'max'],
-            ['metric' => 'soc', 'warn' => 'soc_warn', 'alarm' => 'soc_alarm', 'label' => 'SOC', 'unit' => '%', 'mode' => 'min'],
-            ['metric' => 'soh', 'warn' => 'soh_warn', 'alarm' => 'soh_alarm', 'label' => 'SOH', 'unit' => '%', 'mode' => 'min'],
+            ['code' => 'battery_volt_min', 'metric' => 'volt', 'warn' => 'volt_min_warn', 'alarm' => 'volt_min_alarm', 'label' => 'Voltage Min', 'unit' => 'V', 'mode' => 'min'],
+            ['code' => 'battery_volt_max', 'metric' => 'volt', 'warn' => 'volt_max_warn', 'alarm' => 'volt_max_alarm', 'label' => 'Voltage Max', 'unit' => 'V', 'mode' => 'max'],
+            ['code' => 'battery_temp_min', 'metric' => 'temp', 'warn' => 'temp_min_warn', 'alarm' => 'temp_min_alarm', 'label' => 'Temperature Min', 'unit' => 'C', 'mode' => 'min'],
+            ['code' => 'battery_temp_max', 'metric' => 'temp', 'warn' => 'temp_max_warn', 'alarm' => 'temp_max_alarm', 'label' => 'Temperature Max', 'unit' => 'C', 'mode' => 'max'],
+            ['code' => 'battery_thd_max', 'metric' => 'thd', 'warn' => 'thd_warn', 'alarm' => 'thd_alarm', 'label' => 'THD', 'unit' => '%', 'mode' => 'max'],
+            ['code' => 'battery_soc_min', 'metric' => 'soc', 'warn' => 'soc_warn', 'alarm' => 'soc_alarm', 'label' => 'SOC', 'unit' => '%', 'mode' => 'min'],
+            ['code' => 'battery_soh_min', 'metric' => 'soh', 'warn' => 'soh_warn', 'alarm' => 'soh_alarm', 'label' => 'SOH', 'unit' => '%', 'mode' => 'min'],
         ];
 
         foreach ($checks as $check) {
@@ -53,19 +56,37 @@ class BatteryMonitoringObserver
                 $check['mode']
             );
 
-            Logger::firstOrCreate(
+            $ongoingLog = Logger::query()
+                ->where('device_type', 'battery')
+                ->where('batt_id', $battery->id)
+                ->where('alarm_code', $check['code'])
+                ->whereIn('lifecycle_status', ['open', 'confirm'])
+                ->first();
+
+            if ($ongoingLog) {
+                $ongoingLog->update([
+                    'message' => $message,
+                    'status' => $result['level'],
+                    'alarm_type' => $result['level'],
+                ]);
+
+                continue;
+            }
+
+            Logger::create(
                 [
                     'occurred_at' => $monitoring->measured_at,
-                    'batt_id' => $battery->id,
-                    'message' => $message,
-                ],
-                [
                     'device_type' => 'battery',
                     'daop_id' => $resor->daop_id,
                     'resor_id' => $resor->id,
                     'gardu_id' => $gardu->id,
+                    'batt_id' => $battery->id,
                     'charger_id' => null,
+                    'message' => $message,
                     'status' => $result['level'],
+                    'alarm_type' => $result['level'],
+                    'alarm_code' => $check['code'],
+                    'lifecycle_status' => 'open',
                     'action' => 'coming',
                 ]
             );

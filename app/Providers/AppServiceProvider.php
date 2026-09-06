@@ -3,9 +3,11 @@
 namespace App\Providers;
 
 use App\Models\BatteryMonitoring;
+use App\Models\ChargerMonitoring;
 use App\Models\Logger;
 use App\Models\Resor;
 use App\Observers\BatteryMonitoringObserver;
+use App\Observers\ChargerMonitoringObserver;
 use Illuminate\Support\Facades\View;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\ServiceProvider;
@@ -26,6 +28,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         BatteryMonitoring::observe(BatteryMonitoringObserver::class);
+        ChargerMonitoring::observe(ChargerMonitoringObserver::class);
 
         View::composer('partials.sidebar', function ($view) {
             $query = Resor::query()->orderBy('nama');
