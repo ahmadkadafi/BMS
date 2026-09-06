@@ -12,10 +12,12 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-Artisan::command('logger:backfill {--device=all : all, battery, or charger} {--from= : Start date YYYY-MM-DD} {--to= : End date YYYY-MM-DD} {--limit= : Maximum rows per device} {--batch=100 : Rows processed per batch}', function () {
+Artisan::command('logger:backfill {--device=all : all, battery, or charger} {--from= : Start date YYYY-MM-DD} {--to= : End date YYYY-MM-DD} {--from-id= : Start monitoring ID} {--to-id= : End monitoring ID} {--limit= : Maximum rows per device} {--batch=100 : Rows processed per batch}', function () {
     $device = $this->option('device');
     $from = $this->option('from');
     $to = $this->option('to');
+    $fromId = $this->option('from-id') ? (int) $this->option('from-id') : null;
+    $toId = $this->option('to-id') ? (int) $this->option('to-id') : null;
     $limit = $this->option('limit') ? (int) $this->option('limit') : null;
     $batch = max(1, (int) $this->option('batch'));
 
@@ -27,6 +29,12 @@ Artisan::command('logger:backfill {--device=all : all, battery, or charger} {--f
 
     if (! is_null($limit) && $limit < 1) {
         $this->error('Option --limit harus lebih besar dari 0.');
+
+        return self::FAILURE;
+    }
+
+    if ((! is_null($fromId) && $fromId < 1) || (! is_null($toId) && $toId < 1)) {
+        $this->error('Option --from-id dan --to-id harus lebih besar dari 0.');
 
         return self::FAILURE;
     }
@@ -70,6 +78,8 @@ Artisan::command('logger:backfill {--device=all : all, battery, or charger} {--f
             ->with(['battery.gardu.resor', 'battery.gardu.batterySetting'])
             ->when($from, fn ($q) => $q->whereDate('measured_at', '>=', $from))
             ->when($to, fn ($q) => $q->whereDate('measured_at', '<=', $to))
+            ->when($fromId, fn ($q) => $q->where('id', '>=', $fromId))
+            ->when($toId, fn ($q) => $q->where('id', '<=', $toId))
             ->orderBy('id');
 
         $runBackfill($query, $observer, $processedBattery, 'battery');
@@ -82,6 +92,8 @@ Artisan::command('logger:backfill {--device=all : all, battery, or charger} {--f
             ->with(['charger.gardu.resor', 'charger.chargerSetting'])
             ->when($from, fn ($q) => $q->whereDate('measured_at', '>=', $from))
             ->when($to, fn ($q) => $q->whereDate('measured_at', '<=', $to))
+            ->when($fromId, fn ($q) => $q->where('id', '>=', $fromId))
+            ->when($toId, fn ($q) => $q->where('id', '<=', $toId))
             ->orderBy('id');
 
         $runBackfill($query, $observer, $processedCharger, 'charger');
