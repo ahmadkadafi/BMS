@@ -10,25 +10,13 @@ class ResorDashboardController extends Controller
 {
     public function index(Resor $resor)
     {
-        // subquery: data battery_monitoring terakhir per battery
-        $latestMonitoring = DB::table('battery_monitoring as bm1')
-            ->select(
-                'bm1.battery_id',
-                'bm1.soh'
-            )
-            ->join(
-                DB::raw('
-                    (
-                        SELECT battery_id, MAX(measured_at) AS latest_time
-                        FROM battery_monitoring
-                        GROUP BY battery_id
-                    ) bm2
-                '),
-                function ($join) {
-                    $join->on('bm1.battery_id', '=', 'bm2.battery_id')
-                         ->on('bm1.measured_at', '=', 'bm2.latest_time');
-                }
-            );
+        // Indexed lookup with a stable tie-breaker for equal measurement times.
+        $latestMonitoringId = DB::table('battery_monitoring')
+            ->select('id')
+            ->whereColumn('battery_id', 'battery.id')
+            ->orderByDesc('measured_at')
+            ->orderByDesc('id')
+            ->limit(1);
 
         $gardu = Gardu::select(
                 'gardu.id',
@@ -42,8 +30,8 @@ class ResorDashboardController extends Controller
             )
             ->where('gardu.resor_id', $resor->id)
             ->leftJoin('battery', 'battery.gardu_id', '=', 'gardu.id')
-            ->leftJoinSub($latestMonitoring, 'lm', function ($join) {
-                $join->on('lm.battery_id', '=', 'battery.id');
+            ->leftJoin('battery_monitoring as lm', function ($join) use ($latestMonitoringId) {
+                $join->where('lm.id', '=', $latestMonitoringId);
             })
             ->groupBy(
                 'gardu.id',

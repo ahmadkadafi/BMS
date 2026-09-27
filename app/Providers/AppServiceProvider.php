@@ -55,8 +55,13 @@ class AppServiceProvider extends ServiceProvider
                 $baseQuery->where('resor_id', $allowedResorId);
             }
 
-            $warningCount = (clone $baseQuery)->where('status', 'warning')->count();
-            $alarmCount = (clone $baseQuery)->where('status', 'alarm')->count();
+            $counts = (clone $baseQuery)
+                ->selectRaw('status, COUNT(*) as total')
+                ->groupBy('status')
+                ->pluck('total', 'status');
+
+            $warningCount = (int) ($counts['warning'] ?? 0);
+            $alarmCount = (int) ($counts['alarm'] ?? 0);
             $notificationCount = $warningCount + $alarmCount;
 
             $latestNotifications = (clone $baseQuery)
