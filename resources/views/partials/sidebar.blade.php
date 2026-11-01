@@ -33,8 +33,8 @@
             $isRangkasOnly = strcasecmp(trim((string) ($authUser['username'] ?? '')), 'LAA 1.1 RK') === 0;
             $defaultResorId = $resors->first()?->id;
             $aiPredictionUrl = $isAdmin
-                ? route('dashboard')
-                : ($defaultResorId ? route('dashboard.resor', ['resor' => $defaultResorId]) : '#');
+                ? route('ai-prediction.all')
+                : ($defaultResorId ? route('ai-prediction.resor', ['resor' => $defaultResorId]) : '#');
         @endphp
         <ul class="nav nav-secondary">
             @if (! $isRangkasOnly)

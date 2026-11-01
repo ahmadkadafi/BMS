@@ -1,9 +1,14 @@
 <?php
 
+use App\Models\BatteryDaily;
 use App\Models\BatteryMonitoring;
 use App\Models\ChargerMonitoring;
+use App\Models\Gardu;
 use App\Observers\BatteryMonitoringObserver;
 use App\Observers\ChargerMonitoringObserver;
+use App\Services\IrForecastService;
+use App\Services\ReportStatsService;
+use Carbon\Carbon;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -193,6 +198,124 @@ Artisan::command('logger:sync {--device=all : all, battery, or charger} {--from-
     return self::SUCCESS;
 })->purpose('Generate logger warning/alarm dari data monitoring terbaru untuk production.');
 
+Artisan::command('ai:forecast {--gardu= : Kode gardu, kosong berarti semua} {--as-of= : Replay dari tanggal YYYY-MM-DD} {--force : Ulangi meski anchor sudah diproses}', function () {
+    $service = app(IrForecastService::class);
+
+    if (! $this->option('as-of')) {
+        $this->info('Agregasi harian: '.$service->aggregateDaily().' baris diperbarui.');
+    }
+
+    $gardu = Gardu::query()
+        ->when($this->option('gardu'), fn ($q, $kode) => $q->where('kode', $kode))
+        ->orderBy('id')
+        ->get();
+
+    if ($gardu->isEmpty()) {
+        $this->error('Gardu tidak ditemukan.');
+
+        return self::FAILURE;
+    }
+
+    $failed = false;
+    foreach ($gardu as $item) {
+        $run = $service->forecastGardu($item, $this->option('as-of'), (bool) $this->option('force'));
+
+        if (! $run) {
+            $this->line("{$item->kode}: tidak ada anchor baru");
+            continue;
+        }
+
+        $failed = $failed || $run->status === 'failed';
+        $this->line("{$item->kode}: {$run->status}, anchor {$run->anchor_date->toDateString()}, {$run->n_forecast} prediksi");
+    }
+
+    return $failed ? self::FAILURE : self::SUCCESS;
+})->purpose('Perbarui data harian lalu jalankan forecast internal resistance.');
+
+Artisan::command('ai:import-history {file : Path daily_long.csv hasil tahap 2} {--gardu=CJT : Kode gardu pemilik data}', function () {
+    $gardu = Gardu::query()->where('kode', $this->option('gardu'))->first();
+    $handle = @fopen($this->argument('file'), 'r');
+
+    if (! $gardu || ! $handle) {
+        $this->error('Gardu atau file tidak ditemukan.');
+
+        return self::FAILURE;
+    }
+
+    $batteryIds = $gardu->batteries()->orderBy('id')->pluck('id')->values();
+    $header = fgetcsv($handle);
+    $rows = [];
+    $unmapped = [];
+    $now = now();
+
+    while (($line = fgetcsv($handle)) !== false) {
+        $row = array_combine($header, $line);
+        $batteryId = $batteryIds[(int) $row['cell_id'] - 1] ?? null;
+
+        if (! $batteryId) {
+            $unmapped[$row['cell_id']] = true;
+            continue;
+        }
+
+        $rows[] = [
+            'battery_id' => $batteryId,
+            'gardu_id' => $gardu->id,
+            'date' => $row['date'],
+            'ir' => $row['R'],
+            'volt' => $row['V'],
+            'temp' => $row['T'],
+            'v_charger' => $row['V_charger'] !== '' ? $row['V_charger'] : null,
+            'i_mean' => $row['I_mean'] !== '' ? $row['I_mean'] : null,
+            'i_min' => $row['I_min'] !== '' ? $row['I_min'] : null,
+            'samples' => 0,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ];
+    }
+    fclose($handle);
+
+    foreach (array_chunk($rows, 500) as $chunk) {
+        BatteryDaily::upsert($chunk, ['battery_id', 'date'], ['ir', 'volt', 'temp', 'v_charger', 'i_mean', 'i_min', 'updated_at']);
+    }
+
+    $this->info(count($rows).' baris riwayat diimpor ke '.$gardu->nama.'.');
+
+    if ($unmapped) {
+        $this->warn('Sel tanpa data baterai dilewati: '.implode(', ', array_keys($unmapped)));
+    }
+
+    return self::SUCCESS;
+})->purpose('Impor riwayat harian tesis untuk replay forecast.');
+
+Artisan::command('report:rollup {--from= : Tanggal awal YYYY-MM-DD, default 3 hari lalu} {--to= : Tanggal akhir YYYY-MM-DD, default kemarin}', function () {
+    $timezone = config('app.timezone');
+    $day = $this->option('from')
+        ? Carbon::parse($this->option('from'), $timezone)
+        : now($timezone)->subDays(3)->startOfDay();
+    $to = $this->option('to')
+        ? Carbon::parse($this->option('to'), $timezone)
+        : now($timezone)->subDay()->startOfDay();
+    $service = app(ReportStatsService::class);
+    $processed = 0;
+
+    for (; $day->lte($to); $day->addDay()) {
+        $service->rollup($day->copy());
+        $processed++;
+    }
+
+    $this->info("Ringkasan report diperbarui untuk {$processed} hari.");
+
+    return self::SUCCESS;
+})->purpose('Perbarui ringkasan harian untuk page report.');
+
 Schedule::command('logger:sync --batch=200')
     ->everyMinute()
+    ->withoutOverlapping();
+
+Schedule::command('report:rollup')
+    ->dailyAt('00:15')
+    ->withoutOverlapping();
+
+Schedule::command('ai:forecast')
+    ->hourly()
     ->withoutOverlapping();
