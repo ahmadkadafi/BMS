@@ -4,22 +4,20 @@ namespace App\Http\Controllers;
 
 use App\Models\Gardu;
 use App\Models\Resor;
+use App\Support\DateRange;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class LineController extends Controller
 {
-    public const MAX_RANGE_DAYS = 7;
+    public const MAX_RANGE_DAYS = 30;
 
     // Jumlah titik maksimum per garis; data dirata-rata per interval waktu agar ringan
     private const MAX_POINTS = 300;
 
     public function index(Request $request, ?Resor $resor = null)
     {
-        $timezone = config('app.timezone');
-        $today = now($timezone)->startOfDay();
-
         $gardu = Gardu::query()
             ->when($resor, fn ($q) => $q->where('resor_id', $resor->id))
             ->orderBy('id')
@@ -34,23 +32,11 @@ class LineController extends Controller
             $selectedChart = 'volt';
         }
 
-        $to = $this->parseDate($request->input('to')) ?? $today->copy();
-        $from = $this->parseDate($request->input('from')) ?? $to->copy();
-
-        if ($from->gt($to)) {
-            [$from, $to] = [$to, $from];
-        }
-
-        $rangeNotice = null;
-        if ($from->diffInDays($to) >= self::MAX_RANGE_DAYS) {
-            $from = $to->copy()->subDays(self::MAX_RANGE_DAYS - 1);
-            $rangeNotice = 'Rentang tanggal maksimal '.self::MAX_RANGE_DAYS.' hari. Filter disesuaikan menjadi '
-                .$from->format('d/m/Y').' s/d '.$to->format('d/m/Y').'.';
-        }
-
-        $fromDate = $from->toDateString();
-        $toDate = $to->toDateString();
-        $maxDate = $today->toDateString();
+        $range = DateRange::fromRequest($request, self::MAX_RANGE_DAYS);
+        $fromDate = $range->fromDate();
+        $toDate = $range->toDate();
+        $maxDate = DateRange::maxDate();
+        $rangeNotice = $range->notice;
 
         $chartData = [
             'labels' => [],
@@ -61,7 +47,7 @@ class LineController extends Controller
 
         $selectedGardu = $gardu->firstWhere('id', $selectedGarduId);
         if ($selectedGardu) {
-            $chartData = $this->buildChartData($selectedGardu, $selectedChart, $from, $to->copy()->endOfDay());
+            $chartData = $this->buildChartData($selectedGardu, $selectedChart, $range->from, $range->end());
         }
 
         return view('page.line', compact(
@@ -77,21 +63,6 @@ class LineController extends Controller
         ));
     }
 
-    private function parseDate(mixed $value): ?Carbon
-    {
-        if (! is_string($value) || $value === '') {
-            return null;
-        }
-
-        try {
-            $date = Carbon::createFromFormat('!Y-m-d', $value, config('app.timezone'));
-
-            return $date->toDateString() === $value ? $date : null;
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
     private function buildChartData(Gardu $gardu, string $selectedChart, Carbon $from, Carbon $to): array
     {
         $isCharger = in_array($selectedChart, ['voltage_charger', 'current_charger'], true);
@@ -105,7 +76,7 @@ class LineController extends Controller
             ->orderBy('id')
             ->pluck('id');
 
-        // Interval dipilih dari langkah yang rapi (1 hari ~5 menit, 7 hari ~1 jam)
+        // Interval dipilih dari langkah yang rapi (1 hari ~5 menit, 7 hari ~1 jam, 30 hari ~3 jam)
         $rangeSeconds = $to->timestamp - $from->timestamp + 1;
         $bucketSeconds = collect([60, 120, 300, 600, 900, 1800, 3600, 7200, 10800, 21600])
             ->first(fn ($step) => $rangeSeconds / $step <= self::MAX_POINTS, 21600);

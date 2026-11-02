@@ -2,51 +2,77 @@
 
 namespace App\Http\Controllers;
 
-use Carbon\Carbon;
-use Illuminate\Http\Request;
-use App\Models\Resor;
 use App\Models\Gardu;
-use App\Models\BatteryMonitoring;
-use App\Models\ChargerMonitoring;
+use App\Models\Resor;
+use App\Support\DateRange;
+use Carbon\Carbon;
+use Illuminate\Database\Query\Builder;
+use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TableController extends Controller
 {
+    public const MAX_RANGE_DAYS = 30;
+
+    private const PER_PAGE = 10;
+
+    // Jumlah snapshot yang diproses sekali jalan saat export
+    private const EXPORT_CHUNK = 500;
+
+    private const TABLES = ['volt', 'temp', 'thd', 'soc', 'soh', 'charger'];
+
     public function index(Request $request, ?Resor $resor = null)
     {
         $gardu = Gardu::query()
             ->when($resor, fn ($q) => $q->where('resor_id', $resor->id))
-            ->with(['batteries:id,gardu_id', 'chargers:id,gardu_id'])
+            ->with([
+                'batteries' => fn ($q) => $q->select('id', 'gardu_id')->orderBy('id'),
+                'chargers' => fn ($q) => $q->select('id', 'gardu_id')->orderBy('id'),
+            ])
             ->orderBy('id')
-            ->get();
+            ->get(['id', 'nama']);
 
-        $selectedGarduId = $request->filled('gardu_id')
-            ? (int) $request->gardu_id
-            : ($gardu->contains('id', 1) ? 1 : $gardu->min('id'));
-
-        $garduData = $selectedGarduId
-            ? $gardu->where('id', $selectedGarduId)->values()
-            : $gardu;
-
-        $garduIds = $garduData->pluck('id');
-        $maxBatt = $garduData->max(fn ($g) => $g->batteries->count()) ?? 0;
-        $maxCharger = $garduData->max(fn ($g) => $g->chargers->count()) ?? 0;
-        $selectedTable = $request->input('table', 'volt');
-        $allRows = $this->buildRows($request, $garduData, $garduIds);
-
-        if ($request->boolean('export')) {
-            return $this->exportCsv($resor, $allRows, $selectedTable, $maxBatt);
+        // Tanpa parameter: gardu default; gardu_id kosong dari dropdown: semua gardu
+        if (! $request->has('gardu_id')) {
+            $selectedGarduId = $gardu->contains('id', 1) ? 1 : $gardu->min('id');
+        } else {
+            $selectedGarduId = $gardu->contains('id', (int) $request->gardu_id) ? (int) $request->gardu_id : null;
         }
 
-        $perPage = 10;
+        $garduData = $selectedGarduId ? $gardu->where('id', $selectedGarduId)->values() : $gardu;
+
+        $selectedTable = in_array($request->input('table'), self::TABLES, true) ? $request->input('table') : 'volt';
+        $isCharger = $selectedTable === 'charger';
+
+        $range = DateRange::fromRequest($request, self::MAX_RANGE_DAYS);
+        $fromDate = $range->fromDate();
+        $toDate = $range->toDate();
+        $maxDate = DateRange::maxDate();
+        $rangeNotice = $range->notice;
+
+        $unit = ['volt' => 'V', 'temp' => '°C', 'thd' => 'mΩ', 'soc' => '%', 'soh' => '%'][$selectedTable] ?? '';
+        $valueColumns = $isCharger
+            ? ['Volt Charge (V)', 'Current Charge (A)']
+            : collect(range(1, max(1, (int) $garduData->max(fn ($g) => $g->batteries->count()))))
+                ->map(fn ($i) => 'Batt '.$i.' ('.$unit.')')
+                ->all();
+
+        $snapshots = $this->snapshotQuery($garduData, $isCharger, $range);
+
+        if ($request->boolean('export')) {
+            return $this->exportCsv($snapshots, $garduData, $selectedTable, $valueColumns, $range);
+        }
+
+        $total = DB::query()->fromSub((clone $snapshots)->reorder(), 'snapshots')->count();
         $currentPage = LengthAwarePaginator::resolveCurrentPage();
-        $pageRows = $allRows->slice(($currentPage - 1) * $perPage, $perPage)->values();
         $rows = new LengthAwarePaginator(
-            $pageRows,
-            $allRows->count(),
-            $perPage,
+            $this->buildRows((clone $snapshots)->forPage($currentPage, self::PER_PAGE)->get(), $garduData, $selectedTable, count($valueColumns)),
+            $total,
+            self::PER_PAGE,
             $currentPage,
             [
                 'path' => $request->url(),
@@ -60,133 +86,120 @@ class TableController extends Controller
             'selectedGarduId',
             'rows',
             'selectedTable',
-            'maxBatt',
-            'maxCharger'
+            'valueColumns',
+            'fromDate',
+            'toDate',
+            'maxDate',
+            'rangeNotice'
         ));
     }
 
-    private function buildRows(Request $request, $garduData, $garduIds)
+    /**
+     * Satu baris tabel = satu waktu pengukuran pada satu gardu, terbaru di atas.
+     */
+    private function snapshotQuery(Collection $garduData, bool $isCharger, DateRange $range): Builder
     {
-        $batteryTimes = BatteryMonitoring::query()
-            ->select('measured_at')
-            ->whereHas('battery', fn ($q) => $q->whereIn('gardu_id', $garduIds))
-            ->when($request->filled('from'), fn ($q) =>
-                $q->whereDate('measured_at', '>=', $request->from)
-            )
-            ->when($request->filled('to'), fn ($q) =>
-                $q->whereDate('measured_at', '<=', $request->to)
-            );
+        [$table, $foreignKey, $devices] = $this->source($garduData, $isCharger);
 
-        $chargerTimes = ChargerMonitoring::query()
-            ->select('measured_at')
-            ->whereHas('charger', fn ($q) => $q->whereIn('gardu_id', $garduIds))
-            ->when($request->filled('from'), fn ($q) =>
-                $q->whereDate('measured_at', '>=', $request->from)
-            )
-            ->when($request->filled('to'), fn ($q) =>
-                $q->whereDate('measured_at', '<=', $request->to)
-            );
-
-        $snapshotTimes = DB::query()
-            ->fromSub($batteryTimes->union($chargerTimes), 'snapshots')
-            ->select('measured_at')
+        return DB::table($table.' as m')
+            ->join(($isCharger ? 'charger' : 'battery').' as d', 'd.id', '=', 'm.'.$foreignKey)
+            ->whereIn('m.'.$foreignKey, $devices->keys())
+            ->whereBetween('m.measured_at', [$range->from, $range->end()])
+            ->select('d.gardu_id', 'm.measured_at')
             ->distinct()
-            ->orderByDesc('measured_at')
-            ->limit(500)
-            ->get();
-
-        $timeValues = $snapshotTimes->pluck('measured_at')->all();
-        $batteryRowsByTime = BatteryMonitoring::with(['battery:id,gardu_id'])
-            ->whereIn('measured_at', $timeValues)
-            ->whereHas('battery', fn ($q) => $q->whereIn('gardu_id', $garduIds))
-            ->orderBy('battery_id')
-            ->get()
-            ->groupBy([
-                fn ($row) => (string) $row->measured_at,
-                fn ($row) => optional($row->battery)->gardu_id,
-            ]);
-
-        $chargerRowsByTime = ChargerMonitoring::with(['charger:id,gardu_id'])
-            ->whereIn('measured_at', $timeValues)
-            ->whereHas('charger', fn ($q) => $q->whereIn('gardu_id', $garduIds))
-            ->orderBy('charger_id')
-            ->get()
-            ->groupBy([
-                fn ($row) => (string) $row->measured_at,
-                fn ($row) => optional($row->charger)->gardu_id,
-            ]);
-
-        $allRows = collect();
-
-        foreach ($snapshotTimes as $time) {
-            $timeKey = (string) $time->measured_at;
-
-            foreach ($garduData as $g) {
-                $allRows->push([
-                    'time' => $time->measured_at,
-                    'gardu' => $g->nama,
-                    'batteries' => $batteryRowsByTime->get($timeKey, collect())->get($g->id, collect())->values(),
-                    'chargers' => $chargerRowsByTime->get($timeKey, collect())->get($g->id, collect())->values(),
-                ]);
-            }
-        }
-
-        return $allRows;
+            ->orderByDesc('m.measured_at')
+            ->orderBy('d.gardu_id');
     }
 
-    private function exportCsv(?Resor $resor, $rows, string $selectedTable, int $maxBatt): StreamedResponse
+    private function buildRows(Collection $snapshots, Collection $garduData, string $selectedTable, int $valueCount): Collection
     {
-        $columns = ['No', 'Date', 'Time'];
-        if ($selectedTable === 'charger') {
-            $columns[] = 'Volt Charge';
-            $columns[] = 'Current Charge';
-        } else {
-            $columns[] = 'Lokasi';
-            for ($i = 1; $i <= $maxBatt; $i++) {
-                $columns[] = 'Batt ' . $i;
-            }
+        if ($snapshots->isEmpty()) {
+            return collect();
         }
 
+        $isCharger = $selectedTable === 'charger';
+        [$table, $foreignKey, $devices] = $this->source($garduData, $isCharger);
+        $columns = $isCharger ? ['voltage', 'current'] : [$selectedTable];
+
+        $readings = DB::table($table)
+            ->whereIn($foreignKey, $devices->keys())
+            ->whereIn('measured_at', $snapshots->pluck('measured_at')->unique()->values())
+            ->orderBy($foreignKey)
+            ->get([$foreignKey, 'measured_at', ...$columns])
+            ->groupBy(fn ($row) => $devices[$row->{$foreignKey}]['gardu_id'].'|'.$row->measured_at);
+
+        $garduNames = $garduData->pluck('nama', 'id');
+        $timezone = config('app.timezone');
+
+        return $snapshots->map(function ($snapshot) use ($readings, $devices, $foreignKey, $isCharger, $selectedTable, $valueCount, $garduNames, $timezone) {
+            $group = $readings->get($snapshot->gardu_id.'|'.$snapshot->measured_at, collect());
+
+            if ($isCharger) {
+                $join = fn (string $column) => $group->pluck($column)->filter(fn ($v) => $v !== null)->implode(', ') ?: null;
+                $values = [$join('voltage'), $join('current')];
+            } else {
+                // Nilai ditempatkan sesuai urutan baterai di gardu, sehingga kolom tidak bergeser saat ada data kosong
+                $values = array_fill(0, $valueCount, null);
+                foreach ($group as $reading) {
+                    $values[$devices[$reading->{$foreignKey}]['position']] = $reading->{$selectedTable};
+                }
+            }
+
+            return [
+                'time' => Carbon::parse($snapshot->measured_at, $timezone),
+                'gardu' => $garduNames[$snapshot->gardu_id] ?? '-',
+                'values' => $values,
+            ];
+        });
+    }
+
+    /**
+     * [tabel monitoring, foreign key, device_id => {gardu_id, position}]
+     */
+    private function source(Collection $garduData, bool $isCharger): array
+    {
+        $devices = $garduData->flatMap(fn ($g) => ($isCharger ? $g->chargers : $g->batteries)
+            ->values()
+            ->map(fn ($device, $position) => ['id' => $device->id, 'gardu_id' => $g->id, 'position' => $position])
+        )->keyBy('id');
+
+        return $isCharger
+            ? ['charger_monitoring', 'charger_id', $devices]
+            : ['battery_monitoring', 'battery_id', $devices];
+    }
+
+    private function exportCsv(Builder $snapshots, Collection $garduData, string $selectedTable, array $valueColumns, DateRange $range): StreamedResponse
+    {
         $filename = sprintf(
-            'table-%s-%s.csv',
-            $resor?->id ?? 'all',
-            now()->format('Ymd-His')
+            'bms-%s-%s-%s_%s.csv',
+            $garduData->count() === 1 ? Str::slug($garduData->first()->nama) : 'semua-gardu',
+            $selectedTable === 'thd' ? 'ir' : $selectedTable,
+            $range->from->format('Ymd'),
+            $range->to->format('Ymd')
         );
 
-        return response()->streamDownload(function () use ($rows, $selectedTable, $columns, $maxBatt) {
+        return response()->streamDownload(function () use ($snapshots, $garduData, $selectedTable, $valueColumns) {
             $handle = fopen('php://output', 'w');
             fwrite($handle, "\xEF\xBB\xBF");
-            fputcsv($handle, $columns);
+            fputcsv($handle, ['No', 'Date', 'Time', 'Lokasi', ...$valueColumns]);
 
-            foreach ($rows->values() as $index => $row) {
-                $time = $row['time'] instanceof Carbon
-                    ? $row['time']
-                    : Carbon::parse($row['time']);
+            $number = 0;
+            for ($page = 1; ; $page++) {
+                $chunk = (clone $snapshots)->forPage($page, self::EXPORT_CHUNK)->get();
 
-                $line = [
-                    $index + 1,
-                    $time->format('d/m/Y'),
-                    $time->format('H:i:s'),
-                ];
-
-                if ($selectedTable === 'charger') {
-                    $line[] = collect($row['chargers'])
-                        ->pluck('voltage')
-                        ->filter(fn ($value) => $value !== null && $value !== '')
-                        ->implode(', ') ?: '-';
-                    $line[] = collect($row['chargers'])
-                        ->pluck('current')
-                        ->filter(fn ($value) => $value !== null && $value !== '')
-                        ->implode(', ') ?: '-';
-                } else {
-                    $line[] = $row['gardu'];
-                    for ($i = 0; $i < $maxBatt; $i++) {
-                        $battery = $row['batteries'][$i] ?? null;
-                        $line[] = $battery?->{$selectedTable} ?? '-';
-                    }
+                foreach ($this->buildRows($chunk, $garduData, $selectedTable, count($valueColumns)) as $row) {
+                    fputcsv($handle, [
+                        ++$number,
+                        $row['time']->format('d/m/Y'),
+                        $row['time']->format('H:i:s'),
+                        $row['gardu'],
+                        ...array_map(fn ($value) => $value ?? '-', $row['values']),
+                    ]);
                 }
 
-                fputcsv($handle, $line);
+                if ($chunk->count() < self::EXPORT_CHUNK) {
+                    break;
+                }
             }
 
             fclose($handle);

@@ -69,12 +69,12 @@
 
                 <div class="col-md-2">
                     <label class="form-label fw-bold"><i class="fas fa-calendar-alt text-primary mr-1"></i> Dari Tanggal</label>
-                    <input type="date" name="from" value="{{ request('from') }}" class="form-control">
+                    <input type="date" name="from" id="filterFrom" value="{{ $fromDate }}" max="{{ $maxDate }}" class="form-control" required>
                 </div>
 
                 <div class="col-md-2">
                     <label class="form-label fw-bold"><i class="fas fa-calendar-check text-primary mr-1"></i> Sampai Tanggal</label>
-                    <input type="date" name="to" value="{{ request('to') }}" class="form-control">
+                    <input type="date" name="to" id="filterTo" value="{{ $toDate }}" max="{{ $maxDate }}" class="form-control" required>
                 </div>
 
                 <div class="col-md-2">
@@ -89,14 +89,23 @@
                     </button>
                 </div>
             </div>
+            <small class="text-muted d-block mt-2">
+                <i class="fas fa-info-circle mr-1"></i> Rentang tanggal maksimal {{ \App\Http\Controllers\TableController::MAX_RANGE_DAYS }} hari. Export CSV berisi semua data pada rentang yang dipilih.
+            </small>
         </form>
     </div>
 </div>
 
+@if ($rangeNotice)
+    <div class="alert alert-warning">
+        <i class="fas fa-exclamation-triangle mr-1"></i> {{ $rangeNotice }}
+    </div>
+@endif
+
 <div class="card table-data-card mb-4">
     <div class="card-header fw-bold d-flex justify-content-between align-items-center">
         <span><i class="{{ $meta['icon'] }} mr-1"></i>{{ $meta['title'] }}</span>
-        <small class="text-muted">{{ $rows->total() }} data</small>
+        <small class="text-muted">{{ \Carbon\Carbon::parse($fromDate)->format('d/m/Y') }} s/d {{ \Carbon\Carbon::parse($toDate)->format('d/m/Y') }} | {{ $rows->total() }} data</small>
     </div>
     <div class="card-body">
         <div class="table-responsive">
@@ -106,47 +115,26 @@
                         <th>No</th>
                         <th>Date</th>
                         <th>Time</th>
-                        @if ($selectedTable === 'charger')
-                            <th>Volt Charge</th>
-                            <th>Current Charge</th>
-                        @else
-                            <th>Lokasi</th>
-                            @for ($i = 1; $i <= $maxBatt; $i++)
-                                <th>Batt {{ $i }}</th>
-                            @endfor
-                        @endif
+                        <th>Lokasi</th>
+                        @foreach ($valueColumns as $column)
+                            <th>{{ $column }}</th>
+                        @endforeach
                     </tr>
                 </thead>
                 <tbody>
                     @forelse ($rows as $row)
                     <tr>
                         <td>{{ $rows->firstItem() + $loop->index }}</td>
-                        <td>{{ \Carbon\Carbon::parse($row['time'])->format('d/m/Y') }}</td>
-                        <td>{{ \Carbon\Carbon::parse($row['time'])->format('H:i:s') }}</td>
-                        @if ($selectedTable === 'charger')
-                            @php
-                                $chargerVoltages = collect($row['chargers'])
-                                    ->pluck('voltage')
-                                    ->filter(fn ($value) => $value !== null && $value !== '')
-                                    ->implode(', ');
-                                $chargerCurrents = collect($row['chargers'])
-                                    ->pluck('current')
-                                    ->filter(fn ($value) => $value !== null && $value !== '')
-                                    ->implode(', ');
-                            @endphp
-                            <td>{{ $chargerVoltages !== '' ? $chargerVoltages : '-' }}</td>
-                            <td>{{ $chargerCurrents !== '' ? $chargerCurrents : '-' }}</td>
-                        @else
-                            <td>{{ $row['gardu'] }}</td>
-                            @for ($i = 0; $i < $maxBatt; $i++)
-                                @php $batt = $row['batteries'][$i] ?? null; @endphp
-                                <td>{{ $batt?->{$selectedTable} ?? '-' }}</td>
-                            @endfor
-                        @endif
+                        <td>{{ $row['time']->format('d/m/Y') }}</td>
+                        <td>{{ $row['time']->format('H:i:s') }}</td>
+                        <td>{{ $row['gardu'] }}</td>
+                        @foreach ($row['values'] as $value)
+                            <td>{{ $value ?? '-' }}</td>
+                        @endforeach
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="{{ $selectedTable === 'charger' ? 5 : 4 + $maxBatt }}" class="text-center text-muted py-3">
+                        <td colspan="{{ 4 + count($valueColumns) }}" class="text-center text-muted py-3">
                             Tidak ada data untuk filter yang dipilih.
                         </td>
                     </tr>
@@ -187,6 +175,7 @@
 @endsection
 
 @section('adding')
+@include('partials.date-range-limit', ['maxDays' => \App\Http\Controllers\TableController::MAX_RANGE_DAYS])
 <style>
 .pagination { gap: 4px; }
 .page-item .page-link {

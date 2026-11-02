@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Http\Controllers\GraphicController;
 use App\Http\Controllers\LineController;
 use App\Http\Controllers\MonitoringController;
+use App\Http\Controllers\TableController;
 use App\Services\LatestMonitoringService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -79,8 +80,12 @@ class MonitoringPagesTest extends TestCase
         $this->get('/graphic')->assertOk()->assertSee('voltChart2', false);
         $this->get('/line?gardu_id=1&from=2026-08-01&to=2026-09-09')
             ->assertOk()
-            ->assertSee('Rentang tanggal maksimal 7 hari. Filter disesuaikan', false)
+            ->assertSee('Rentang tanggal maksimal 30 hari. Filter disesuaikan', false)
             ->assertSee('max="2026-09-10"', false);
+        $this->get('/table?gardu_id=1&table=thd&from=2026-09-01&to=2026-09-09')
+            ->assertOk()
+            ->assertSee('Batt 2 (mΩ)', false)
+            ->assertSee('3 data', false);
     }
 
     public function test_line_filter_uses_selected_range_and_aligns_series(): void
@@ -96,16 +101,16 @@ class MonitoringPagesTest extends TestCase
         $this->assertSame([[55.0]], array_column($charger['chartData']['datasets'], 'data'));
     }
 
-    public function test_line_range_is_clamped_to_seven_days_and_input_is_sanitized(): void
+    public function test_line_range_is_clamped_to_thirty_days_and_input_is_sanitized(): void
     {
         $data = $this->line(['from' => '2026-08-01', 'to' => '2026-09-09', 'chart' => 'volt; DROP TABLE battery']);
 
-        $this->assertSame('2026-09-03', $data['fromDate']);
+        $this->assertSame('2026-08-11', $data['fromDate']);
         $this->assertSame('2026-09-09', $data['toDate']);
         $this->assertNotNull($data['rangeNotice']);
         $this->assertSame('volt', $data['selectedChart']);
-        // Data 1 September berada di luar rentang hasil penyesuaian
-        $this->assertSame(['08/09 10:00', '09/09 10:00'], $data['chartData']['labels']);
+        // Rentang 30 hari dirata-rata per 3 jam
+        $this->assertSame(['01/09 09:00', '08/09 09:00', '09/09 09:00'], $data['chartData']['labels']);
 
         $swapped = $this->line(['from' => '2026-09-09', 'to' => '2026-09-03']);
         $this->assertSame(['2026-09-03', '2026-09-09'], [$swapped['fromDate'], $swapped['toDate']]);
@@ -114,6 +119,49 @@ class MonitoringPagesTest extends TestCase
         $invalid = $this->line(['from' => 'abc', 'to' => '2026-02-31']);
         $this->assertSame(['2026-09-10', '2026-09-10'], [$invalid['fromDate'], $invalid['toDate']]);
         $this->assertSame([], $invalid['chartData']['datasets']);
+    }
+
+    public function test_table_keeps_battery_columns_aligned_and_supports_all_gardu(): void
+    {
+        $data = $this->table(['gardu_id' => 1, 'table' => 'volt', 'from' => '2026-09-01', 'to' => '2026-09-09']);
+        $rows = $data['rows'];
+
+        $this->assertSame(['Batt 1 (V)', 'Batt 2 (V)'], $data['valueColumns']);
+        $this->assertSame(3, $rows->total());
+        $this->assertSame(['09/09 10:00', '08/09 10:00', '01/09 10:00'], $rows->getCollection()->map(fn ($r) => $r['time']->format('d/m H:i'))->all());
+        // Battery 1 tidak punya data 8 September; nilai battery 2 tetap di kolom kedua
+        $this->assertEquals([null, 11.0], $rows->getCollection()[1]['values']);
+
+        $all = $this->table(['gardu_id' => '', 'table' => 'volt', 'from' => '2026-09-01', 'to' => '2026-09-09']);
+        $this->assertNull($all['selectedGarduId']);
+        $this->assertSame(['Gardu 1', 'Gardu 2', 'Gardu 1', 'Gardu 1'], $all['rows']->getCollection()->pluck('gardu')->all());
+
+        $charger = $this->table(['gardu_id' => 1, 'table' => 'charger', 'from' => '2026-09-08', 'to' => '2026-09-09']);
+        $this->assertSame(['Volt Charge (V)', 'Current Charge (A)'], $charger['valueColumns']);
+        $this->assertEquals([[55, 2], [54, 2]], $charger['rows']->getCollection()->pluck('values')->all());
+
+        $clamped = $this->table(['table' => 'bogus', 'from' => '2026-07-01', 'to' => '2026-09-09']);
+        $this->assertSame(['2026-08-11', '2026-09-09', 'volt'], [$clamped['fromDate'], $clamped['toDate'], $clamped['selectedTable']]);
+        $this->assertNotNull($clamped['rangeNotice']);
+    }
+
+    public function test_table_csv_export_contains_every_row_in_range(): void
+    {
+        $this->withSession(['auth_user' => ['role' => 'admin']]);
+
+        $response = $this->get('/table?gardu_id=1&table=volt&from=2026-09-01&to=2026-09-09&export=1');
+        $response->assertOk()->assertDownload('bms-gardu-1-volt-20260901_20260909.csv');
+
+        $lines = array_map('str_getcsv', explode("
+", trim(substr($response->streamedContent(), 3))));
+        $this->assertSame(['No', 'Date', 'Time', 'Lokasi', 'Batt 1 (V)', 'Batt 2 (V)'], $lines[0]);
+        $this->assertCount(4, $lines);
+        $this->assertSame(['2', '08/09/2026', '10:00:00', 'Gardu 1', '-', '11'], $lines[2]);
+    }
+
+    private function table(array $query): array
+    {
+        return app(TableController::class)->index(Request::create('/table', 'GET', $query))->getData();
     }
 
     private function line(array $query): array
