@@ -37,7 +37,20 @@
         </div>
     </div>
 
-    <div class="row g-4">
+    @php
+        $periodLabel = \Carbon\Carbon::create($year, $month, 1)->translatedFormat('F Y');
+    @endphp
+    <div class="report-print-header">
+        <h3>Laporan Bulanan Battery Management System</h3>
+        <table>
+            <tr><td>Resor</td><td>: {{ $resor?->nama ?? 'Semua Resor' }}</td></tr>
+            <tr><td>Periode</td><td>: {{ $periodLabel }}</td></tr>
+            <tr><td>Jumlah Gardu</td><td>: {{ $reportCards->count() }}</td></tr>
+            <tr><td>Dicetak</td><td>: {{ now()->format('d/m/Y H:i') }}</td></tr>
+        </table>
+    </div>
+
+    <div class="row g-4 report-grid">
         @forelse ($reportCards as $card)
             @php
                 $g = $card['gardu'];
@@ -75,7 +88,7 @@
                             <small class="text-muted">Kode: {{ $g->kode }} | Bulan {{ str_pad($month, 2, '0', STR_PAD_LEFT) }}/{{ $year }}</small>
                         </div>
                         <span class="badge bg-{{ $remainingClass }} px-3 py-2">
-                            <i class="fas fa-hourglass-half me-1"></i> Sisa Umur Baterai: {{ is_null($remainingInt) ? '-' : $remainingInt }}
+                            <i class="fas fa-hourglass-half me-1"></i> Sisa Umur Baterai: {{ is_null($remainingInt) ? '-' : $remainingInt.' hari' }}
                         </span>
                     </div>
 
@@ -101,8 +114,11 @@
                             </div>
                         </div>
 
+                        <div class="report-body">
                         <div class="chart-wrap mb-3">
                             <canvas id="minMaxChart{{ $g->id }}"></canvas>
+                            {{-- Salinan gambar grafik untuk dicetak; canvas tidak menyesuaikan ukuran kertas --}}
+                            <img class="chart-print-img" id="minMaxChartImg{{ $g->id }}" alt="Grafik min/max {{ $g->nama }}">
                         </div>
 
                         <div class="table-responsive">
@@ -132,7 +148,7 @@
                                         <td>{{ $fmt($card['max_volt_cell'], 'V') }}</td>
                                     </tr>
                                     <tr>
-                                        <td class="text-start"><i class="fas fa-wave-square text-info me-2"></i>IR</td>
+                                        <td class="text-start"><i class="fas fa-tachometer-alt text-info me-2"></i>IR</td>
                                         <td>{{ $fmtDate($card['min_thd_at']) }}</td>
                                         <td>{{ $fmt($card['min_thd'], 'mΩ') }}</td>
                                         <td>{{ $fmtDate($card['max_thd_at']) }}</td>
@@ -168,6 +184,7 @@
                                     </tr>
                                 </tbody>
                             </table>
+                        </div>
                         </div>
                     </div>
                 </div>
@@ -259,34 +276,257 @@
     color: #b42318;
 }
 
+/* Hanya tampil saat dicetak */
+.report-print-header,
+.chart-print-img {
+    display: none;
+}
+
+@page {
+    size: A4 portrait;
+    margin: 12mm 10mm;
+}
+
 @media print {
+    /* Template membuat wrapper setinggi layar dengan overflow hidden; tanpa ini hasil cetak terpotong */
+    html,
+    body,
+    .wrapper,
+    .main-panel,
+    .main-panel > .container {
+        position: static !important;
+        float: none !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        overflow: visible !important;
+        transform: none !important;
+    }
+
+    body {
+        background: #fff !important;
+        font-size: 11px;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
     .sidebar,
     .main-header,
+    .footer,
     .report-filter-card,
-    .btn,
-    .page-header,
-    .footer {
+    .btn {
         display: none !important;
     }
 
-    .main-panel,
-    .container,
     .page-inner {
-        margin: 0 !important;
         padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    .report-print-header {
+        display: block;
+        border-bottom: 2px solid #1f3a8a;
+        padding-bottom: 6px;
+        margin-bottom: 10px;
+    }
+
+    .report-print-header h3 {
+        font-size: 16px;
+        font-weight: 700;
+        margin: 0 0 6px;
+        color: #1f3a8a;
+    }
+
+    .report-print-header table td {
+        padding: 0 8px 0 0;
+        font-size: 11px;
+    }
+
+    .report-grid {
+        margin: 0 !important;
+        --bs-gutter-x: 0;
+        --bs-gutter-y: 0;
+    }
+
+    .report-grid > [class*="col-"] {
+        flex: 0 0 100%;
         width: 100% !important;
         max-width: 100% !important;
+        padding: 0 !important;
     }
 
     .report-card {
-        break-inside: avoid;
+        height: auto !important;
+        margin-bottom: 5mm;
+        border: 1px solid #cfd8e3 !important;
+        border-radius: 8px !important;
         box-shadow: none !important;
-        border: 1px solid #ddd !important;
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    .report-card .card-header {
+        padding: 6px 12px !important;
+    }
+
+    .report-card .card-header h5 {
+        font-size: 14px;
+    }
+
+    .report-card .card-body {
+        padding: 8px 12px !important;
+    }
+
+    .report-card .row.g-3 {
+        --bs-gutter-y: 0;
+        margin-bottom: 6px !important;
+    }
+
+    .report-card .row.g-3 > .col-md-6 {
+        flex: 0 0 50%;
+        max-width: 50%;
+    }
+
+    .metric-tile {
+        padding: 4px 10px;
+        gap: 8px;
+    }
+
+    .metric-tile .icon-wrap {
+        width: 26px;
+        height: 26px;
+        font-size: 12px;
+    }
+
+    .metric-tile .value {
+        font-size: 15px;
+    }
+
+    .chart-wrap {
+        height: auto;
+        padding: 4px;
+        margin-bottom: 6px !important;
+    }
+
+    /* Grafik di kiri, tabel di kanan agar 2-3 gardu muat per halaman */
+    .report-body {
+        display: grid;
+        grid-template-columns: 42% 1fr;
+        gap: 8px;
+        align-items: center;
+    }
+
+    .report-body .chart-wrap {
+        margin-bottom: 0 !important;
+    }
+
+    /* Pakai gambar cetak jika sudah tersedia; jika belum, canvas tetap dicetak */
+    .chart-wrap:has(.chart-print-img[src]) canvas {
+        display: none !important;
+    }
+
+    .chart-print-img[src] {
+        display: block;
+        width: 100%;
+        height: auto;
+    }
+
+    .table-responsive {
+        overflow: visible !important;
+    }
+
+    /* Selector lebih spesifik dari template yang memaksa padding 16px 24px */
+    .report-card .table > thead > tr > th,
+    .report-card .table > tbody > tr > td {
+        padding: 3px 8px !important;
+        font-size: 10px !important;
+        letter-spacing: 0;
+        line-height: 1.3;
+        white-space: nowrap;
+        height: auto !important;
     }
 }
 </style>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
+function reportChartConfig(cfg, fontSize) {
+    return {
+        type: 'bar',
+        data: {
+            labels: cfg.labels,
+            datasets: [
+                {
+                    label: 'Minimum',
+                    data: cfg.min,
+                    backgroundColor: 'rgba(255, 159, 64, 0.75)',
+                    borderColor: 'rgba(255, 159, 64, 1)',
+                    borderWidth: 1,
+                    borderRadius: 6
+                },
+                {
+                    label: 'Maksimum',
+                    data: cfg.max,
+                    backgroundColor: 'rgba(54, 162, 235, 0.75)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1,
+                    borderRadius: 6
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        usePointStyle: true,
+                        pointStyle: 'rectRounded',
+                        boxWidth: 8,
+                        boxHeight: 8,
+                        padding: 10,
+                        font: { size: fontSize }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    ticks: {
+                        maxRotation: 0,
+                        autoSkip: false,
+                        font: { size: fontSize }
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    grid: { display: false },
+                    ticks: { font: { size: fontSize } }
+                }
+            }
+        }
+    };
+}
+
+// Gambar untuk cetak dirender sekali dengan ukuran tetap, tidak bergantung lebar layar
+function renderPrintImage(cfg, img) {
+    var canvas = document.createElement('canvas');
+    canvas.width = 560;
+    canvas.height = 380;
+
+    var config = reportChartConfig(cfg, 13);
+    config.options.responsive = false;
+    config.options.animation = false;
+    config.options.devicePixelRatio = 2;
+
+    var chart = new Chart(canvas, config);
+    img.src = chart.toBase64Image('image/png', 1);
+    chart.destroy();
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     if (typeof Chart === 'undefined' || !window.reportChartData) {
         return;
@@ -295,100 +535,23 @@ document.addEventListener('DOMContentLoaded', function () {
     Object.keys(window.reportChartData).forEach(function (garduId) {
         var cfg = window.reportChartData[garduId];
         var ctx = document.getElementById('minMaxChart' + garduId);
+        var img = document.getElementById('minMaxChartImg' + garduId);
         if (!ctx) return;
 
-        new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: cfg.labels,
-                datasets: [
-                    {
-                        label: 'Minimum',
-                        data: cfg.min,
-                        backgroundColor: 'rgba(255, 159, 64, 0.75)',
-                        borderColor: 'rgba(255, 159, 64, 1)',
-                        borderWidth: 1,
-                        borderRadius: 6
-                    },
-                    {
-                        label: 'Maksimum',
-                        data: cfg.max,
-                        backgroundColor: 'rgba(54, 162, 235, 0.75)',
-                        borderColor: 'rgba(54, 162, 235, 1)',
-                        borderWidth: 1,
-                        borderRadius: 6
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'bottom',
-                        labels: {
-                            usePointStyle: true,
-                            pointStyle: 'rectRounded',
-                            boxWidth: 8,
-                            boxHeight: 8,
-                            padding: 10,
-                            font: { size: 10 }
-                        }
-                    }
-                },
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        usePointStyle: true,
-                        boxWidth: 8,
-                        fontSize: 10
-                    }
-                },
-                scales: {
-                    x: {
-                        grid: {
-                            display: false,
-                            drawBorder: false
-                        },
-                        ticks: {
-                            maxRotation: 0,
-                            autoSkip: false,
-                            font: { size: 10 }
-                        }
-                    },
-                    y: {
-                        beginAtZero: true,
-                        grid: {
-                            display: false,
-                            drawBorder: false
-                        },
-                        ticks: { font: { size: 10 } }
-                    },
-                    xAxes: [{
-                        gridLines: {
-                            display: false,
-                            drawBorder: false
-                        },
-                        ticks: {
-                            maxRotation: 0,
-                            autoSkip: false,
-                            fontSize: 10
-                        }
-                    }],
-                    yAxes: [{
-                        gridLines: {
-                            display: false,
-                            drawBorder: false
-                        },
-                        ticks: {
-                            beginAtZero: true,
-                            fontSize: 10
-                        }
-                    }]
-                }
-            }
-        });
+        new Chart(ctx, reportChartConfig(cfg, 10));
+
+        if (img) {
+            renderPrintImage(cfg, img);
+        }
     });
 });
+
+// Nama file PDF bawaan browser diambil dari judul halaman
+(function () {
+    var originalTitle = document.title;
+    var printTitle = @json('Report BMS - '.($resor?->nama ?? 'Semua Resor').' - '.sprintf('%04d-%02d', $year, $month));
+    window.addEventListener('beforeprint', function () { document.title = printTitle; });
+    window.addEventListener('afterprint', function () { document.title = originalTitle; });
+})();
 </script>
 @endsection

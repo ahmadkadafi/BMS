@@ -143,7 +143,7 @@
                     <div class="col-lg-4">
                         <div class="chart-card">
                             <div class="chart-header">
-                                <i class="fas fa-wave-square text-info"></i>
+                                <i class="fas fa-tachometer-alt text-info"></i>
                                 IR (m&#8486;)
                             </div>
                             <div class="chart-box">
