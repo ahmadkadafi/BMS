@@ -63,12 +63,6 @@
         </div>
     </div>
 
-    {{-- FILTER DATA --}}
-    @php
-        $filteredGardu = request('gardu_id')
-            ? $gardu->where('id', request('gardu_id'))
-            : $gardu;
-    @endphp
 
     @foreach ($filteredGardu as $g)
         @php
@@ -203,7 +197,7 @@
 @endsection
 
 @section('adding')
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
 <style>
 .chart-card {

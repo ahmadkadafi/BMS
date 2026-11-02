@@ -39,7 +39,7 @@
 <div class="page-inner">
     <div class="card line-filter-card mb-4">
         <div class="card-body">
-            <form method="GET">
+            <form method="GET" id="lineFilterForm">
                 <div class="row g-3 align-items-end">
                     <div class="col-md-2">
                         <label class="form-label fw-bold"><i class="fas fa-map-marker-alt text-primary mr-1"></i> Lokasi</label>
@@ -65,12 +65,12 @@
 
                     <div class="col-md-2">
                         <label class="form-label fw-bold"><i class="fas fa-calendar-alt text-primary mr-1"></i> Dari Tanggal</label>
-                        <input type="date" name="from" class="form-control" value="{{ $fromDate }}">
+                        <input type="date" name="from" id="filterFrom" class="form-control" value="{{ $fromDate }}" max="{{ $maxDate }}" required>
                     </div>
 
                     <div class="col-md-2">
                         <label class="form-label fw-bold"><i class="fas fa-calendar-check text-primary mr-1"></i> Sampai Tanggal</label>
-                        <input type="date" name="to" class="form-control" value="{{ $toDate }}">
+                        <input type="date" name="to" id="filterTo" class="form-control" value="{{ $toDate }}" max="{{ $maxDate }}" required>
                     </div>
 
                     <div class="col-md-3">
@@ -79,9 +79,18 @@
                         </button>
                     </div>
                 </div>
+                <small class="text-muted d-block mt-2">
+                    <i class="fas fa-info-circle mr-1"></i> Rentang tanggal maksimal {{ \App\Http\Controllers\LineController::MAX_RANGE_DAYS }} hari.
+                </small>
             </form>
         </div>
     </div>
+
+    @if ($rangeNotice)
+        <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle mr-1"></i> {{ $rangeNotice }}
+        </div>
+    @endif
 
     <div class="card line-chart-card mb-4">
         <div class="card-header line-chart-head d-flex justify-content-between align-items-center">
@@ -108,7 +117,7 @@
 @endsection
 
 @section('adding')
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
 <style>
 .line-legend-note {
@@ -118,6 +127,7 @@
 </style>
 
 <script>
+const maxRangeDays = @json(\App\Http\Controllers\LineController::MAX_RANGE_DAYS);
 const chartLabels = @json($chartData['labels']);
 const chartDatasets = @json($chartData['datasets']);
 const chartUnit = @json($chartData['unit']);
@@ -136,14 +146,66 @@ function stylizeDatasets(datasets) {
         pointHoverRadius: 4,
         borderWidth: 2,
         tension: 0.3,
+        spanGaps: true,
         fill: false
     }));
 }
+
+// Batasi rentang tanggal maksimal maxRangeDays hari (inklusif)
+(function () {
+    const fromInput = document.getElementById('filterFrom');
+    const toInput = document.getElementById('filterTo');
+    const today = toInput.max;
+
+    function shiftDate(value, days) {
+        const date = new Date(value + 'T00:00:00');
+        date.setDate(date.getDate() + days);
+        const pad = (n) => String(n).padStart(2, '0');
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    }
+
+    function minDate(a, b) {
+        return a < b ? a : b;
+    }
+
+    function syncLimits() {
+        // "Dari" bebas dipilih; "Sampai" dibatasi maksimal maxRangeDays hari setelahnya
+        if (fromInput.value) {
+            toInput.min = fromInput.value;
+            toInput.max = minDate(shiftDate(fromInput.value, maxRangeDays - 1), today);
+        }
+    }
+
+    fromInput.addEventListener('change', function () {
+        if (!fromInput.value) {
+            return;
+        }
+        const latestTo = minDate(shiftDate(fromInput.value, maxRangeDays - 1), today);
+        if (!toInput.value || toInput.value < fromInput.value || toInput.value > latestTo) {
+            toInput.value = latestTo < fromInput.value ? fromInput.value : latestTo;
+        }
+        syncLimits();
+    });
+
+    toInput.addEventListener('change', function () {
+        if (!toInput.value) {
+            return;
+        }
+        const earliestFrom = shiftDate(toInput.value, -(maxRangeDays - 1));
+        if (!fromInput.value || fromInput.value > toInput.value || fromInput.value < earliestFrom) {
+            fromInput.value = earliestFrom;
+        }
+        syncLimits();
+    });
+
+    syncLimits();
+})();
 
 if (document.getElementById('lineChart')) {
     new Chart(document.getElementById('lineChart'), {
         type: 'line',
         data: {
+            labels: chartLabels,
             datasets: stylizeDatasets(chartDatasets)
         },
         options: {

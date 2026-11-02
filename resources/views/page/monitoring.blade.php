@@ -88,9 +88,6 @@
         </div>
     </div>
 
-    @php
-        $filteredGardu = request('gardu_id') ? $gardu->where('id', request('gardu_id')) : $gardu;
-    @endphp
 
     @forelse ($filteredGardu as $g)
         @php

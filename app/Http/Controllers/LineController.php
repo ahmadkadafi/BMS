@@ -2,34 +2,55 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\BatteryMonitoring;
-use App\Models\ChargerMonitoring;
 use App\Models\Gardu;
 use App\Models\Resor;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class LineController extends Controller
 {
+    public const MAX_RANGE_DAYS = 7;
+
+    // Jumlah titik maksimum per garis; data dirata-rata per interval waktu agar ringan
+    private const MAX_POINTS = 300;
+
     public function index(Request $request, ?Resor $resor = null)
     {
-        $appNow = now(config('app.timezone'));
+        $timezone = config('app.timezone');
+        $today = now($timezone)->startOfDay();
 
         $gardu = Gardu::query()
             ->when($resor, fn ($q) => $q->where('resor_id', $resor->id))
-            ->with(['batteries:id,gardu_id', 'chargers:id,gardu_id'])
             ->orderBy('id')
-            ->get();
+            ->get(['id', 'nama']);
 
-        $selectedGarduId = $request->filled('gardu_id')
+        $selectedGarduId = $request->filled('gardu_id') && $gardu->contains('id', (int) $request->gardu_id)
             ? (int) $request->gardu_id
             : ($gardu->contains('id', 1) ? 1 : $gardu->min('id'));
 
-        $selectedChart = $request->input('chart', 'volt');
-        $toDate = $request->input('to', $appNow->toDateString());
-        $fromDate = $request->input('from', $appNow->toDateString());
+        $selectedChart = $request->input('chart');
+        if (! is_string($selectedChart) || ! array_key_exists($selectedChart, $this->chartColumns())) {
+            $selectedChart = 'volt';
+        }
 
-        $selectedGardu = $gardu->firstWhere('id', $selectedGarduId);
+        $to = $this->parseDate($request->input('to')) ?? $today->copy();
+        $from = $this->parseDate($request->input('from')) ?? $to->copy();
+
+        if ($from->gt($to)) {
+            [$from, $to] = [$to, $from];
+        }
+
+        $rangeNotice = null;
+        if ($from->diffInDays($to) >= self::MAX_RANGE_DAYS) {
+            $from = $to->copy()->subDays(self::MAX_RANGE_DAYS - 1);
+            $rangeNotice = 'Rentang tanggal maksimal '.self::MAX_RANGE_DAYS.' hari. Filter disesuaikan menjadi '
+                .$from->format('d/m/Y').' s/d '.$to->format('d/m/Y').'.';
+        }
+
+        $fromDate = $from->toDateString();
+        $toDate = $to->toDateString();
+        $maxDate = $today->toDateString();
 
         $chartData = [
             'labels' => [],
@@ -38,17 +59,9 @@ class LineController extends Controller
             'unit' => $this->chartUnit($selectedChart),
         ];
 
+        $selectedGardu = $gardu->firstWhere('id', $selectedGarduId);
         if ($selectedGardu) {
-            $from = Carbon::parse($fromDate, config('app.timezone'))->startOfDay();
-            $to = Carbon::parse($toDate, config('app.timezone'))->endOfDay();
-
-            if ($from->gt($to)) {
-                [$from, $to] = [$to->copy()->startOfDay(), $from->copy()->endOfDay()];
-                $fromDate = $from->toDateString();
-                $toDate = $to->toDateString();
-            }
-
-            $chartData = $this->buildChartData($selectedGardu, $selectedChart, $from, $to);
+            $chartData = $this->buildChartData($selectedGardu, $selectedChart, $from, $to->copy()->endOfDay());
         }
 
         return view('page.line', compact(
@@ -58,64 +71,102 @@ class LineController extends Controller
             'selectedChart',
             'fromDate',
             'toDate',
+            'maxDate',
+            'rangeNotice',
             'chartData'
         ));
     }
 
-    private function buildChartData(Gardu $gardu, string $selectedChart, Carbon $from, Carbon $to): array
+    private function parseDate(mixed $value): ?Carbon
     {
-        if (in_array($selectedChart, ['voltage_charger', 'current_charger'], true)) {
-            $metric = $selectedChart === 'voltage_charger' ? 'voltage' : 'current';
-
-            $datasets = $gardu->chargers->values()->map(function ($charger, $index) use ($from, $to, $metric) {
-                $points = $charger->monitorings()
-                    ->whereBetween('measured_at', [$from, $to])
-                    ->orderBy('measured_at')
-                    ->limit(300)
-                    ->get(['measured_at', $metric])
-                    ->map(fn ($row) => [
-                        'x' => Carbon::parse($row->measured_at)->timezone(config('app.timezone'))->format('d/m H:i'),
-                        'y' => $row->{$metric},
-                    ])
-                    ->values();
-
-                return [
-                    'label' => 'Charger ' . ($index + 1),
-                    'data' => $points,
-                ];
-            })->all();
-
-            return [
-                'labels' => [],
-                'datasets' => $datasets,
-                'title' => $this->chartTitle($selectedChart),
-                'unit' => $this->chartUnit($selectedChart),
-            ];
+        if (! is_string($value) || $value === '') {
+            return null;
         }
 
-        $datasets = $gardu->batteries->values()->map(function ($battery, $index) use ($from, $to, $selectedChart) {
-            $points = $battery->monitorings()
-                ->whereBetween('measured_at', [$from, $to])
-                ->orderBy('measured_at')
-                ->limit(300)
-                ->get(['measured_at', $selectedChart])
-                ->map(fn ($row) => [
-                    'x' => Carbon::parse($row->measured_at)->timezone(config('app.timezone'))->format('d/m H:i'),
-                    'y' => $row->{$selectedChart},
-                ])
-                ->values();
+        try {
+            $date = Carbon::createFromFormat('!Y-m-d', $value, config('app.timezone'));
 
-            return [
-                'label' => 'Battery ' . ($index + 1),
-                'data' => $points,
-            ];
-        })->all();
+            return $date->toDateString() === $value ? $date : null;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function buildChartData(Gardu $gardu, string $selectedChart, Carbon $from, Carbon $to): array
+    {
+        $isCharger = in_array($selectedChart, ['voltage_charger', 'current_charger'], true);
+        [$table, $foreignKey, $prefix] = $isCharger
+            ? ['charger_monitoring', 'charger_id', 'Charger']
+            : ['battery_monitoring', 'battery_id', 'Battery'];
+        $column = $this->chartColumns()[$selectedChart];
+
+        $deviceIds = DB::table($isCharger ? 'charger' : 'battery')
+            ->where('gardu_id', $gardu->id)
+            ->orderBy('id')
+            ->pluck('id');
+
+        // Interval dipilih dari langkah yang rapi (1 hari ~5 menit, 7 hari ~1 jam)
+        $rangeSeconds = $to->timestamp - $from->timestamp + 1;
+        $bucketSeconds = collect([60, 120, 300, 600, 900, 1800, 3600, 7200, 10800, 21600])
+            ->first(fn ($step) => $rangeSeconds / $step <= self::MAX_POINTS, 21600);
+
+        $rows = $deviceIds->isEmpty() ? collect() : DB::table($table)
+            ->selectRaw(
+                $foreignKey.' as device_id, '.$this->bucketExpression('measured_at', $bucketSeconds).' as bucket, AVG('.$column.') as value',
+                [$from->format('Y-m-d H:i:s')]
+            )
+            ->whereIn($foreignKey, $deviceIds)
+            ->whereBetween('measured_at', [$from, $to])
+            ->groupBy($foreignKey, 'bucket')
+            ->get();
+
+        $buckets = $rows->pluck('bucket')->map(fn ($bucket) => (int) $bucket)->unique()->sort()->values();
+        $labels = $buckets
+            ->map(fn ($bucket) => $from->copy()->addSeconds($bucket * $bucketSeconds)->format('d/m H:i'))
+            ->all();
+
+        $datasets = [];
+        if ($buckets->isNotEmpty()) {
+            $byDevice = $rows->groupBy('device_id');
+            $datasets = $deviceIds->values()->map(function ($id, $index) use ($byDevice, $buckets, $prefix) {
+                $values = collect($byDevice->get($id, []))
+                    ->mapWithKeys(fn ($row) => [(int) $row->bucket => round((float) $row->value, 2)]);
+
+                return [
+                    'label' => $prefix.' '.($index + 1),
+                    'data' => $buckets->map(fn ($bucket) => $values->get($bucket))->all(),
+                ];
+            })->all();
+        }
 
         return [
-            'labels' => [],
+            'labels' => $labels,
             'datasets' => $datasets,
             'title' => $this->chartTitle($selectedChart),
             'unit' => $this->chartUnit($selectedChart),
+        ];
+    }
+
+    // Nomor interval dari selisih detik measured_at terhadap waktu awal (binding), tanpa konversi timezone
+    private function bucketExpression(string $column, int $bucketSeconds): string
+    {
+        return match (DB::connection()->getDriverName()) {
+            'sqlite' => "((strftime('%s', {$column}) - strftime('%s', ?)) / {$bucketSeconds})",
+            'pgsql' => "FLOOR(EXTRACT(EPOCH FROM ({$column} - CAST(? AS timestamp))) / {$bucketSeconds})",
+            default => "(TIMESTAMPDIFF(SECOND, ?, {$column}) DIV {$bucketSeconds})",
+        };
+    }
+
+    private function chartColumns(): array
+    {
+        return [
+            'volt' => 'volt',
+            'temp' => 'temp',
+            'thd' => 'thd',
+            'soc' => 'soc',
+            'soh' => 'soh',
+            'voltage_charger' => 'voltage',
+            'current_charger' => 'current',
         ];
     }
 
