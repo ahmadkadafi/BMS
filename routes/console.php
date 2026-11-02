@@ -7,6 +7,7 @@ use App\Models\Gardu;
 use App\Observers\BatteryMonitoringObserver;
 use App\Observers\ChargerMonitoringObserver;
 use App\Services\IrForecastService;
+use App\Services\LoggerSyncService;
 use App\Services\ReportStatsService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Inspiring;
@@ -123,77 +124,21 @@ Artisan::command('logger:sync {--device=all : all, battery, or charger} {--from-
         return self::FAILURE;
     }
 
-    $processedBattery = 0;
-    $processedCharger = 0;
-    $runSync = function ($modelClass, array $with, $observer, &$processed, string $label, string $source) use ($batch, $fromStart) {
-        $state = DB::table('logger_sync_state')->where('source', $source)->first();
+    $result = app(LoggerSyncService::class)->sync(
+        $device,
+        $fromStart,
+        $batch,
+        progress: fn (string $message) => $this->info($message)
+    );
 
-        if (! $state) {
-            $lastId = $fromStart ? 0 : (int) $modelClass::query()->max('id');
+    if (! $result) {
+        $this->info('Sync logger lain masih berjalan, dilewati.');
 
-            DB::table('logger_sync_state')->insert([
-                'source' => $source,
-                'last_id' => $lastId,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            if (! $fromStart) {
-                $this->info("{$label} sync state dibuat dari ID terakhir: {$lastId}");
-                return;
-            }
-        } else {
-            $lastId = (int) $state->last_id;
-        }
-
-        $this->info("Mulai sync {$label} dari ID > {$lastId}");
-
-        $modelClass::query()
-            ->with($with)
-            ->where('id', '>', $lastId)
-            ->orderBy('id')
-            ->chunkById($batch, function ($monitorings) use ($observer, &$processed, $label, $source, &$lastId) {
-                foreach ($monitorings as $monitoring) {
-                    $observer->created($monitoring);
-                    $processed++;
-                    $lastId = max($lastId, (int) $monitoring->id);
-                }
-
-                DB::table('logger_sync_state')
-                    ->where('source', $source)
-                    ->update([
-                        'last_id' => $lastId,
-                        'updated_at' => now(),
-                    ]);
-
-                $this->info("{$label} sync diproses: {$processed}");
-            });
-    };
-
-    if (in_array($device, ['all', 'battery'], true)) {
-        $runSync(
-            BatteryMonitoring::class,
-            ['battery.gardu.resor', 'battery.gardu.batterySetting'],
-            app(BatteryMonitoringObserver::class),
-            $processedBattery,
-            'battery',
-            'battery_monitoring'
-        );
+        return self::SUCCESS;
     }
 
-    if (in_array($device, ['all', 'charger'], true)) {
-        $runSync(
-            ChargerMonitoring::class,
-            ['charger.gardu.resor', 'charger.chargerSetting'],
-            app(ChargerMonitoringObserver::class),
-            $processedCharger,
-            'charger',
-            'charger_monitoring'
-        );
-    }
-
-    $this->info("Battery monitoring sync: {$processedBattery}");
-    $this->info("Charger monitoring sync: {$processedCharger}");
+    $this->info("Battery monitoring sync: {$result['battery']}");
+    $this->info("Charger monitoring sync: {$result['charger']}");
 
     return self::SUCCESS;
 })->purpose('Generate logger warning/alarm dari data monitoring terbaru untuk production.');

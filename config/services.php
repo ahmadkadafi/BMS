@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    // Token Bearer untuk Node-RED mengirim data ke /api/ingest/monitoring
+    'ingest' => [
+        'token' => env('INGEST_TOKEN'),
+    ],
+
 ];
