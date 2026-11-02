@@ -24,7 +24,7 @@
                         <th rowspan="3">Gardu</th>
                         <th colspan="4">Voltage (V)</th>
                         <th colspan="4">Temperature (°C)</th>
-                        <th colspan="2">THD (%)</th>
+                        <th colspan="2">IR (m&#8486;)</th>
                         <th colspan="2">SOC (%)</th>
                         <th colspan="2">SOH (%)</th>
                         <th rowspan="3">Action</th>
@@ -171,8 +171,8 @@
                                             @endforeach
                                         </div>
 
-                                        {{-- THD --}}
-                                        <h6 class="fw-bold mb-3">THD (%)</h6>
+                                        {{-- IR --}}
+                                        <h6 class="fw-bold mb-3">IR (m&#8486;)</h6>
                                         <div class="row g-3 mb-4">
                                             @foreach (['thd_warn'=>'Warn','thd_alarm'=>'Alarm'] as $f=>$l)
                                             <div class="col-md-6">

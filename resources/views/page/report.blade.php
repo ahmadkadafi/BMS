@@ -47,7 +47,7 @@
                 $fmt = fn ($v, $unit = '') => is_null($v) ? '-' : number_format((float) $v, 2).($unit ? ' '.$unit : '');
                 $fmtDate = fn ($v) => is_null($v) ? '-' : \Carbon\Carbon::parse($v)->format('d/m/Y');
 
-                $chartLabels = ['Temp', 'Volt Cell', 'THD', 'SOC', 'SOH', 'Volt Charge', 'Curr Charge'];
+                $chartLabels = ['Temp', 'Volt Cell', 'IR', 'SOC', 'SOH', 'Volt Charge', 'Curr Charge'];
                 $chartMin = [
                     $card['min_temp'],
                     $card['min_volt_cell'],
@@ -132,11 +132,11 @@
                                         <td>{{ $fmt($card['max_volt_cell'], 'V') }}</td>
                                     </tr>
                                     <tr>
-                                        <td class="text-start"><i class="fas fa-wave-square text-info me-2"></i>THD</td>
+                                        <td class="text-start"><i class="fas fa-wave-square text-info me-2"></i>IR</td>
                                         <td>{{ $fmtDate($card['min_thd_at']) }}</td>
-                                        <td>{{ $fmt($card['min_thd'], '%') }}</td>
+                                        <td>{{ $fmt($card['min_thd'], 'mΩ') }}</td>
                                         <td>{{ $fmtDate($card['max_thd_at']) }}</td>
-                                        <td>{{ $fmt($card['max_thd'], '%') }}</td>
+                                        <td>{{ $fmt($card['max_thd'], 'mΩ') }}</td>
                                     </tr>
                                     <tr>
                                         <td class="text-start"><i class="fas fa-chart-line text-primary me-2"></i>SOC</td>

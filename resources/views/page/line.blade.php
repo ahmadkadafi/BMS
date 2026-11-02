@@ -7,7 +7,7 @@
     $chartOptions = [
         'volt' => 'Voltage Cell',
         'temp' => 'Temperature Cell',
-        'thd' => 'THD Cell',
+        'thd' => 'IR Cell',
         'soc' => 'SOC Cell',
         'soh' => 'SOH Cell',
         'voltage_charger' => 'Voltage Charger',

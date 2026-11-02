@@ -30,7 +30,7 @@ class BatteryMonitoringObserver
             ['code' => 'battery_volt_max', 'metric' => 'volt', 'warn' => 'volt_max_warn', 'alarm' => 'volt_max_alarm', 'label' => 'Voltage Max', 'unit' => 'V', 'mode' => 'max'],
             ['code' => 'battery_temp_min', 'metric' => 'temp', 'warn' => 'temp_min_warn', 'alarm' => 'temp_min_alarm', 'label' => 'Temperature Min', 'unit' => 'C', 'mode' => 'min'],
             ['code' => 'battery_temp_max', 'metric' => 'temp', 'warn' => 'temp_max_warn', 'alarm' => 'temp_max_alarm', 'label' => 'Temperature Max', 'unit' => 'C', 'mode' => 'max'],
-            ['code' => 'battery_thd_max', 'metric' => 'thd', 'warn' => 'thd_warn', 'alarm' => 'thd_alarm', 'label' => 'THD', 'unit' => '%', 'mode' => 'max'],
+            ['code' => 'battery_thd_max', 'metric' => 'thd', 'warn' => 'thd_warn', 'alarm' => 'thd_alarm', 'label' => 'IR', 'unit' => 'mΩ', 'mode' => 'max'],
             ['code' => 'battery_soc_min', 'metric' => 'soc', 'warn' => 'soc_warn', 'alarm' => 'soc_alarm', 'label' => 'SOC', 'unit' => '%', 'mode' => 'min'],
             ['code' => 'battery_soh_min', 'metric' => 'soh', 'warn' => 'soh_warn', 'alarm' => 'soh_alarm', 'label' => 'SOH', 'unit' => '%', 'mode' => 'min'],
         ];

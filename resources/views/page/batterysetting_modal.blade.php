@@ -76,8 +76,8 @@
                         </div>
                     </div>
 
-                    {{-- THD --}}
-                    <h6 class="fw-bold mb-3">THD (%)</h6>
+                    {{-- IR --}}
+                    <h6 class="fw-bold mb-3">IR (m&#8486;)</h6>
                     <div class="row g-3 mb-4">
                         <div class="col-md-6">
                             <label>Warn</label>

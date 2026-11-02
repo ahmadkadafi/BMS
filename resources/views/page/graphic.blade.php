@@ -139,12 +139,12 @@
                         </div>
                     </div>
 
-                    {{-- THD --}}
+                    {{-- IR --}}
                     <div class="col-lg-4">
                         <div class="chart-card">
                             <div class="chart-header">
                                 <i class="fas fa-wave-square text-info"></i>
-                                THD (%)
+                                IR (m&#8486;)
                             </div>
                             <div class="chart-box">
                                 <canvas id="thdChart{{ $g->id }}"></canvas>

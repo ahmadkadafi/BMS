@@ -174,7 +174,7 @@ class LineController extends Controller
     {
         return match ($selectedChart) {
             'temp' => 'Temperature Cell',
-            'thd' => 'THD Cell',
+            'thd' => 'IR Cell',
             'soc' => 'SOC Cell',
             'soh' => 'SOH Cell',
             'voltage_charger' => 'Voltage Charger',
@@ -188,7 +188,8 @@ class LineController extends Controller
         return match ($selectedChart) {
             'volt', 'voltage_charger' => 'V',
             'temp' => 'C',
-            'thd', 'soc', 'soh' => '%',
+            'thd' => 'mΩ',
+            'soc', 'soh' => '%',
             'current_charger' => 'A',
             default => '',
         };

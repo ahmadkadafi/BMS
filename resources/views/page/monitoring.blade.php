@@ -155,7 +155,7 @@
                                     </div>
                                     <div class="metric-item d-flex justify-content-between align-items-center">
                                         <h6 class="mb-0 d-flex align-items-center">
-                                            <span class="metric-icon text-secondary"><i class="fa fa-battery-half"></i></span>THD
+                                            <span class="metric-icon text-secondary"><i class="fa fa-battery-half"></i></span>IR
                                         </h6>
                                         <h6 class="mb-0">{{ $last->thd ?? '-' }} m&#8486;</h6>
                                     </div>
@@ -196,7 +196,7 @@
                                 </div>
                                 <div class="metric-item d-flex justify-content-between align-items-center">
                                     <h6 class="mb-0 d-flex align-items-center">
-                                        <span class="metric-icon text-secondary"><i class="fa fa-battery-half"></i></span>THD
+                                        <span class="metric-icon text-secondary"><i class="fa fa-battery-half"></i></span>IR
                                     </h6>
                                     <h6 class="mb-0">{{ $latestBatteryMonitorings->isNotEmpty() ? $avgThd : '-' }} m&#8486;</h6>
                                 </div>

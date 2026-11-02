@@ -7,7 +7,7 @@
     $cellCards = [
         'volt' => ['title' => ' Voltage Cell (V)', 'icon' => 'fas fa-bolt text-warning'],
         'temp' => ['title' => ' Temperature Cell (°C)', 'icon' => 'fas fa-thermometer-half text-danger'],
-        'thd' => ['title' => ' THD Cell', 'icon' => 'fas fa-wave-square text-info'],
+        'thd' => ['title' => ' IR Cell (m&#8486;)', 'icon' => 'fas fa-wave-square text-info'],
         'soc' => ['title' => ' SOC Cell (%)', 'icon' => 'fas fa-chart-line text-primary'],
         'soh' => ['title' => ' SOH Cell (%)', 'icon' => 'fas fa-heartbeat text-success'],
         'charger' => ['title' => ' Charger', 'icon' => 'fas fa-charging-station text-secondary'],
@@ -60,7 +60,7 @@
                     <select name="table" class="form-select">
                         <option value="volt" {{ $selectedTable == 'volt' ? 'selected' : '' }}>Voltage Cell</option>
                         <option value="temp" {{ $selectedTable == 'temp' ? 'selected' : '' }}>Temperature Cell</option>
-                        <option value="thd" {{ $selectedTable == 'thd' ? 'selected' : '' }}>THD Cell</option>
+                        <option value="thd" {{ $selectedTable == 'thd' ? 'selected' : '' }}>IR Cell</option>
                         <option value="soc" {{ $selectedTable == 'soc' ? 'selected' : '' }}>SOC Cell</option>
                         <option value="soh" {{ $selectedTable == 'soh' ? 'selected' : '' }}>SOH Cell</option>
                         <option value="charger" {{ $selectedTable == 'charger' ? 'selected' : '' }}>Charger</option>
