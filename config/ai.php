@@ -17,6 +17,12 @@ return [
 
     'horizons' => [1, 7, 30],
 
+    // Jam jalan harian ai:forecast (zona waktu aplikasi), setelah report:rollup 00:15
+    'schedule_at' => env('AI_FORECAST_AT', '00:30'),
+
+    // Jumlah hari ke belakang yang dilengkapi tiap jalan jika ada tanggal yang belum diprediksi
+    'catchup_days' => (int) env('AI_FORECAST_CATCHUP_DAYS', 30),
+
     // Riwayat harian yang dikirim ke model (lookback terbesar + 1 hari + toleransi gap)
     'history_days' => 130,
 ];

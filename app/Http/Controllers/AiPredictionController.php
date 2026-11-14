@@ -7,15 +7,23 @@ use App\Models\Gardu;
 use App\Models\IrForecast;
 use App\Models\IrForecastRun;
 use App\Models\Resor;
+use App\Support\DateRange;
 use Carbon\Carbon;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AiPredictionController extends Controller
 {
     private const HISTORY_DAYS = 60;
+
+    public const TABULATION_MAX_DAYS = 31;
+
+    private const TABULATION_PER_PAGE = 50;
 
     public function index(Request $request, ?Resor $resor = null)
     {
@@ -86,6 +94,58 @@ class AiPredictionController extends Controller
         ]);
     }
 
+    /**
+     * Tabulasi prediksi vs aktual: satu baris = satu prediksi sel, dibandingkan dengan IR harian
+     * pada tanggal target. Filter tanggal memakai tanggal target.
+     */
+    public function tabulation(Request $request, ?Resor $resor = null)
+    {
+        $gardu = $this->garduList($resor);
+        $selectedGardu = $this->selectedGardu($request, $gardu);
+        $horizons = config('ai.horizons');
+        $selectedHorizon = in_array((int) $request->input('horizon'), $horizons, true) ? (int) $request->input('horizon') : null;
+
+        $cells = $selectedGardu
+            ? $selectedGardu->batteries()->orderBy('id')->pluck('id')->mapWithKeys(fn ($id, $index) => [$id => 'Sel '.($index + 1)])
+            : collect();
+        $selectedCell = $cells->has((int) $request->input('cell')) ? (int) $request->input('cell') : null;
+
+        if (! $request->filled('from') && ! $request->filled('to')) {
+            $today = now(config('app.timezone'));
+            $request->merge([
+                'from' => $today->copy()->subDays(self::TABULATION_MAX_DAYS - 1)->toDateString(),
+                'to' => $today->toDateString(),
+            ]);
+        }
+        $range = DateRange::fromRequest($request, self::TABULATION_MAX_DAYS);
+
+        $query = $this->tabulationQuery($selectedGardu, $range, $selectedHorizon, $selectedCell);
+
+        if ($request->boolean('export')) {
+            return $this->exportTabulation($query, $cells, $selectedGardu, $range);
+        }
+
+        $rows = (clone $query)->paginate(self::TABULATION_PER_PAGE)->withQueryString();
+        $rows->setCollection($rows->getCollection()->map(fn ($row) => $this->tabulationRow($row, $cells)));
+
+        return view('page.ai_tabulation', [
+            'resor' => $resor,
+            'gardu' => $gardu,
+            'selectedGardu' => $selectedGardu,
+            'cells' => $cells,
+            'selectedCell' => $selectedCell,
+            'horizons' => $horizons,
+            'selectedHorizon' => $selectedHorizon,
+            'fromDate' => $range->fromDate(),
+            'toDate' => $range->toDate(),
+            'maxDate' => DateRange::maxDate(),
+            'rangeNotice' => $range->notice,
+            'rows' => $rows,
+            'metrics' => $this->tabulationMetrics($query, $horizons),
+            'pending' => (clone $query)->reorder()->whereNull('d.ir')->count(),
+        ]);
+    }
+
     public function status(Request $request, ?Resor $resor = null): JsonResponse
     {
         $selectedGardu = $this->selectedGardu($request, $this->garduList($resor));
@@ -96,6 +156,126 @@ class AiPredictionController extends Controller
         return response()->json([
             'version' => IrForecastRun::query()->where('gardu_id', $selectedGardu->id)->max('id'),
             'latest' => $this->latestReading($selectedGardu),
+        ]);
+    }
+
+    private function tabulationQuery(?Gardu $gardu, DateRange $range, ?int $horizon, ?int $cell): Builder
+    {
+        return DB::table('ir_forecast as f')
+            ->leftJoin('battery_daily as d', function ($join) {
+                $join->on('d.battery_id', '=', 'f.battery_id')
+                    ->on('d.date', '=', 'f.target_date');
+            })
+            ->where('f.gardu_id', $gardu?->id ?? 0)
+            ->whereBetween('f.target_date', [$range->fromDate(), $range->toDate()])
+            ->when($horizon, fn ($q) => $q->where('f.horizon', $horizon))
+            ->when($cell, fn ($q) => $q->where('f.battery_id', $cell))
+            ->orderByDesc('f.target_date')
+            ->orderBy('f.horizon')
+            ->orderBy('f.battery_id')
+            ->select('f.battery_id', 'f.anchor_date', 'f.target_date', 'f.horizon', 'f.model', 'f.r_anchor', 'f.r_pred', 'f.r_low', 'f.r_high', 'f.quality', 'd.ir as r_actual');
+    }
+
+    private function tabulationRow(object $row, Collection $cells): array
+    {
+        $actual = is_null($row->r_actual) ? null : (float) $row->r_actual;
+        $pred = (float) $row->r_pred;
+        $error = is_null($actual) ? null : $pred - $actual;
+
+        return [
+            'cell' => $cells[$row->battery_id] ?? 'Sel ?',
+            'anchor_date' => Carbon::parse($row->anchor_date),
+            'target_date' => Carbon::parse($row->target_date),
+            'horizon' => (int) $row->horizon,
+            'model' => $row->model,
+            'r_anchor' => (float) $row->r_anchor,
+            'r_pred' => $pred,
+            'r_actual' => $actual,
+            'error' => $error,
+            'error_pct' => is_null($error) || $actual == 0.0 ? null : abs($error) / $actual * 100,
+            'in_band' => is_null($actual) || is_null($row->r_low) ? null : $actual >= (float) $row->r_low && $actual <= (float) $row->r_high,
+            'quality' => $row->quality,
+        ];
+    }
+
+    /**
+     * MAE, RMSE, MAPE model dan MAE persistence per horizon, hanya untuk prediksi berkualitas
+     * baik yang nilai aktualnya sudah ada.
+     */
+    private function tabulationMetrics(Builder $query, array $horizons): array
+    {
+        $rows = (clone $query)
+            ->reorder()
+            ->whereNotNull('d.ir')
+            ->where('f.quality', 'ok')
+            ->groupBy('f.horizon')
+            ->select(DB::raw('f.horizon, COUNT(*) as n,
+                AVG(ABS(f.r_pred - d.ir)) as mae,
+                AVG((f.r_pred - d.ir) * (f.r_pred - d.ir)) as mse,
+                AVG(CASE WHEN d.ir <> 0 THEN ABS(f.r_pred - d.ir) / d.ir END) * 100 as mape,
+                AVG(ABS(f.r_anchor - d.ir)) as mae_persist'))
+            ->get()
+            ->keyBy('horizon');
+
+        return collect($horizons)->mapWithKeys(function ($h) use ($rows) {
+            $row = $rows[$h] ?? null;
+            $mae = $row ? (float) $row->mae : null;
+            $persist = $row ? (float) $row->mae_persist : null;
+
+            return [$h => [
+                'n' => (int) ($row->n ?? 0),
+                'mae' => $mae,
+                'rmse' => $row ? sqrt((float) $row->mse) : null,
+                'mape' => $row && ! is_null($row->mape) ? (float) $row->mape : null,
+                'mae_persist' => $persist,
+                'skill' => $persist ? 100 * (1 - $mae / $persist) : null,
+            ]];
+        })->all();
+    }
+
+    private function exportTabulation(Builder $query, Collection $cells, ?Gardu $gardu, DateRange $range): StreamedResponse
+    {
+        $filename = sprintf(
+            'tabulasi-prediksi-ir-%s-%s_%s.csv',
+            $gardu ? Str::slug($gardu->nama) : 'gardu',
+            $range->from->format('Ymd'),
+            $range->to->format('Ymd')
+        );
+
+        return response()->streamDownload(function () use ($query, $cells, $gardu) {
+            $handle = fopen('php://output', 'w');
+            fwrite($handle, "\xEF\xBB\xBF");
+            fputcsv($handle, [
+                'No', 'Lokasi', 'Tanggal Anchor', 'Tanggal Target', 'Horizon', 'Sel', 'Model',
+                'IR Anchor (mOhm)', 'IR Prediksi (mOhm)', 'IR Aktual (mOhm)', 'Selisih (mOhm)', 'Error (%)', 'Dalam Rentang 95%', 'Kualitas',
+            ]);
+
+            $number = 0;
+            (clone $query)->chunk(500, function ($chunk) use ($handle, $cells, $gardu, &$number) {
+                foreach ($chunk as $item) {
+                    $row = $this->tabulationRow($item, $cells);
+                    fputcsv($handle, [
+                        ++$number,
+                        $gardu?->nama,
+                        $row['anchor_date']->format('d/m/Y'),
+                        $row['target_date']->format('d/m/Y'),
+                        'H+'.$row['horizon'],
+                        $row['cell'],
+                        $row['model'],
+                        round($row['r_anchor'], 3),
+                        round($row['r_pred'], 4),
+                        $row['r_actual'] ?? '-',
+                        is_null($row['error']) ? '-' : round($row['error'], 4),
+                        is_null($row['error_pct']) ? '-' : round($row['error_pct'], 2),
+                        is_null($row['in_band']) ? '-' : ($row['in_band'] ? 'Ya' : 'Tidak'),
+                        $row['quality'],
+                    ]);
+                }
+            });
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
     }
 

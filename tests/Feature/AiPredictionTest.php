@@ -199,6 +199,71 @@ class AiPredictionTest extends TestCase
             ->assertViewHas('selectedGardu', fn ($gardu) => $gardu->id === 2);
     }
 
+    public function test_pending_forecast_fills_every_missed_day(): void
+    {
+        $this->seedGardu();
+        foreach (['2026-05-01', '2026-05-02', '2026-05-03', '2026-05-04'] as $date) {
+            $this->daily(1, $date, 4.5);
+        }
+        IrForecastRun::create(['gardu_id' => 1, 'anchor_date' => '2026-05-02', 'status' => 'ok']);
+        IrForecastRun::create(['gardu_id' => 1, 'anchor_date' => '2026-05-03', 'status' => 'failed']);
+        $this->fakeModel([]);
+
+        $runs = app(IrForecastService::class)->forecastPending(Gardu::find(1), 30);
+
+        $this->assertSame(['2026-05-01', '2026-05-03', '2026-05-04'], $runs->map(fn ($run) => $run->anchor_date->toDateString())->all());
+        Process::assertRan(fn ($process) => collect(json_decode($process->input, true)['cells'])->every(fn ($cell) => $cell['anchor'] === '2026-05-01'));
+        $this->assertSame([], app(IrForecastService::class)->forecastPending(Gardu::find(1), 30)->all());
+    }
+
+    public function test_pending_forecast_respects_catchup_window(): void
+    {
+        $this->seedGardu();
+        foreach (['2026-04-01', '2026-05-03', '2026-05-04'] as $date) {
+            $this->daily(1, $date, 4.5);
+        }
+        $this->fakeModel([]);
+
+        $runs = app(IrForecastService::class)->forecastPending(Gardu::find(1), 2);
+
+        $this->assertSame(['2026-05-03', '2026-05-04'], $runs->map(fn ($run) => $run->anchor_date->toDateString())->all());
+    }
+
+    public function test_tabulation_compares_prediction_with_actual(): void
+    {
+        $this->seedGardu();
+        $this->daily(1, '2026-05-03', 4.60);
+        DB::table('ir_forecast')->insert(['gardu_id' => 1] + $this->forecastRow(1));
+        DB::table('ir_forecast')->insert(['gardu_id' => 1] + $this->forecastRow(1, 'ok', ['horizon' => 7, 'model' => 'LSTM_h7', 'target_date' => '2026-05-09']));
+
+        $this->asAdmin()->get('/ai-prediction/tabulation?gardu_id=1&from=2026-05-01&to=2026-05-10')
+            ->assertOk()
+            ->assertSee('4.5200')
+            ->assertSee('4.600')
+            ->assertSee('-0.0800')
+            ->assertSee('1.74')
+            ->assertSee('Menunggu nilai aktual')
+            ->assertViewHas('metrics', fn ($m) => $m[1]['n'] === 1 && abs($m[1]['mae'] - 0.08) < 1e-6 && $m[7]['n'] === 0)
+            ->assertViewHas('pending', 1);
+
+        $this->asAdmin()->get('/ai-prediction/tabulation?gardu_id=1&from=2026-05-01&to=2026-05-10&horizon=7')
+            ->assertViewHas('rows', fn ($rows) => $rows->total() === 1);
+    }
+
+    public function test_tabulation_exports_csv(): void
+    {
+        $this->seedGardu();
+        $this->daily(1, '2026-05-03', 4.60);
+        DB::table('ir_forecast')->insert(['gardu_id' => 1] + $this->forecastRow(1));
+
+        $response = $this->asAdmin()->get('/ai-prediction/tabulation?gardu_id=1&from=2026-05-01&to=2026-05-10&export=1');
+
+        $response->assertOk()->assertDownload('tabulasi-prediksi-ir-cilejit-20260501_20260510.csv');
+        $csv = $response->streamedContent();
+        $this->assertStringContainsString('IR Prediksi (mOhm)', $csv);
+        $this->assertStringContainsString('03/05/2026,H+1,"Sel 1",LSTM_h1,4.5,4.52,4.6,-0.08,1.74,Tidak,ok', $csv);
+    }
+
     public function test_status_endpoint_reports_latest_run_version(): void
     {
         $this->seedGardu();

@@ -14,9 +14,15 @@ battery_daily                             setara daily_long.csv pada tahap 2
 ir_forecast + ir_forecast_run             dibaca halaman AI Prediction
 ```
 
-`php artisan ai:forecast` terjadwal tiap jam, tetapi hanya memanggil model jika ada hari lengkap
-baru. IR diukur sekitar sekali sehari, jadi prediksi harian adalah resolusi yang sesuai dengan
-pelatihan model.
+`php artisan ai:forecast` terjadwal sekali sehari pukul 00:30 (`AI_FORECAST_AT`). Setiap jalan,
+semua tanggal di `battery_daily` pada 30 hari terakhir (`AI_FORECAST_CATCHUP_DAYS`, atau `--days=`)
+yang belum punya run berhasil ikut diprediksi, termasuk run yang sebelumnya gagal. Jadi hari yang
+terlewat karena scheduler mati atau data terlambat tetap terisi. IR diukur sekitar sekali sehari,
+jadi prediksi harian adalah resolusi yang sesuai dengan pelatihan model.
+
+Hasilnya dapat dilihat di menu AI Prediction > Tabulasi Prediksi vs Aktual. Halaman ini memasangkan
+setiap prediksi dengan IR harian pada tanggal target, menghitung MAE, RMSE, dan MAPE per horizon
+dibanding persistence, dan bisa diekspor ke CSV.
 
 ## Pemasangan
 

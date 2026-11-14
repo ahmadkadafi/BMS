@@ -143,7 +143,7 @@ Artisan::command('logger:sync {--device=all : all, battery, or charger} {--from-
     return self::SUCCESS;
 })->purpose('Generate logger warning/alarm dari data monitoring terbaru untuk production.');
 
-Artisan::command('ai:forecast {--gardu= : Kode gardu, kosong berarti semua} {--as-of= : Replay dari tanggal YYYY-MM-DD} {--force : Ulangi meski anchor sudah diproses}', function () {
+Artisan::command('ai:forecast {--gardu= : Kode gardu, kosong berarti semua} {--as-of= : Replay dari tanggal YYYY-MM-DD} {--force : Ulangi meski anchor sudah diproses} {--days= : Jumlah hari ke belakang yang dilengkapi, default config ai.catchup_days}', function () {
     $service = app(IrForecastService::class);
 
     if (! $this->option('as-of')) {
@@ -161,17 +161,25 @@ Artisan::command('ai:forecast {--gardu= : Kode gardu, kosong berarti semua} {--a
         return self::FAILURE;
     }
 
+    // Tanpa --as-of/--force: lengkapi setiap hari yang belum diprediksi, bukan hanya hari terakhir
+    $single = $this->option('as-of') || $this->option('force');
+    $days = (int) ($this->option('days') ?: config('ai.catchup_days'));
+
     $failed = false;
     foreach ($gardu as $item) {
-        $run = $service->forecastGardu($item, $this->option('as-of'), (bool) $this->option('force'));
+        $runs = $single
+            ? collect([$service->forecastGardu($item, $this->option('as-of'), (bool) $this->option('force'))])->filter()
+            : $service->forecastPending($item, $days);
 
-        if (! $run) {
+        if ($runs->isEmpty()) {
             $this->line("{$item->kode}: tidak ada anchor baru");
             continue;
         }
 
-        $failed = $failed || $run->status === 'failed';
-        $this->line("{$item->kode}: {$run->status}, anchor {$run->anchor_date->toDateString()}, {$run->n_forecast} prediksi");
+        foreach ($runs as $run) {
+            $failed = $failed || $run->status === 'failed';
+            $this->line("{$item->kode}: {$run->status}, anchor {$run->anchor_date->toDateString()}, {$run->n_forecast} prediksi");
+        }
     }
 
     return $failed ? self::FAILURE : self::SUCCESS;
@@ -261,6 +269,7 @@ Schedule::command('report:rollup')
     ->dailyAt('00:15')
     ->withoutOverlapping();
 
+// Sekali sehari setelah hari kemarin lengkap; hari yang terlewat ikut dilengkapi
 Schedule::command('ai:forecast')
-    ->hourly()
+    ->dailyAt(config('ai.schedule_at'))
     ->withoutOverlapping();

@@ -266,6 +266,9 @@
                         </tbody>
                     </table>
                     <small class="text-muted">MAE dalam m&#8486;. Hanya prediksi berkualitas baik yang tanggal targetnya sudah terlewati.</small>
+                    <a class="d-block mt-2 small" href="{{ $resor ? route('ai-prediction.tabulation.resor', ['resor' => $resor->id, 'gardu_id' => $selectedGardu?->id]) : route('ai-prediction.tabulation.all', ['gardu_id' => $selectedGardu?->id]) }}">
+                        <i class="fas fa-table mr-1"></i> Lihat tabulasi prediksi vs aktual
+                    </a>
                 </div>
             </div>
         </div>

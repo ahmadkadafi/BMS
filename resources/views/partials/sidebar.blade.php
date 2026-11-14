@@ -35,6 +35,9 @@
             $aiPredictionUrl = $isAdmin
                 ? route('ai-prediction.all')
                 : ($defaultResorId ? route('ai-prediction.resor', ['resor' => $defaultResorId]) : '#');
+            $aiTabulationUrl = $isAdmin
+                ? route('ai-prediction.tabulation.all')
+                : ($defaultResorId ? route('ai-prediction.tabulation.resor', ['resor' => $defaultResorId]) : '#');
         @endphp
         <ul class="nav nav-secondary">
             @if (! $isRangkasOnly)
@@ -64,10 +67,25 @@
                 </div>
             </li>
             <li class="nav-item">
-                <a href="{{ $aiPredictionUrl }}">
+                <a data-bs-toggle="collapse" href="#aiPrediction">
                     <i class="fas fa-brain"></i>
                     <p>AI Prediction</p>
+                    <span class="caret"></span>
                 </a>
+                <div class="collapse" id="aiPrediction">
+                    <ul class="nav nav-collapse">
+                        <li>
+                            <a href="{{ $aiPredictionUrl }}">
+                                <span class="sub-item">Forecast</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{{ $aiTabulationUrl }}">
+                                <span class="sub-item">Tabulasi Prediksi vs Aktual</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
             </li>
             @endif
             <li class="nav-item">

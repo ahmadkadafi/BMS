@@ -51,6 +51,7 @@ Route::middleware(['auth.session', 'admin.only'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'dashboard'])->name('dashboard');
     Route::get('/ai-prediction', [AiPredictionController::class, 'index'])->name('ai-prediction.all');
     Route::get('/ai-prediction/status', [AiPredictionController::class, 'status'])->name('ai-prediction.status');
+    Route::get('/ai-prediction/tabulation', [AiPredictionController::class, 'tabulation'])->name('ai-prediction.tabulation.all');
     Route::get('/monitoring', [MonitoringController::class, 'index'])->name('monitoring.all');
     Route::get('/graphic', [GraphicController::class, 'index'])->name('graphic.all');
     Route::get('/line', [LineController::class, 'index'])->name('line.all');
@@ -68,6 +69,8 @@ Route::middleware(['auth.session', 'resor.access'])->group(function () {
         ->name('ai-prediction.resor');
     Route::get('/ai-prediction/resor/{resor}/status', [AiPredictionController::class, 'status'])
         ->name('ai-prediction.resor.status');
+    Route::get('/ai-prediction/resor/{resor}/tabulation', [AiPredictionController::class, 'tabulation'])
+        ->name('ai-prediction.tabulation.resor');
     Route::get('/monitoring/resor/{resor}', [MonitoringController::class, 'index'])
         ->name('monitoring.resor');
     Route::get('/graphic/resor/{resor}', [GraphicController::class, 'index'])

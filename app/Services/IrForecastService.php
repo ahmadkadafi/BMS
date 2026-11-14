@@ -102,6 +102,41 @@ class IrForecastService
     }
 
     /**
+     * Forecast setiap hari pada $days hari terakhir yang belum punya run berhasil, urut dari
+     * yang terlama. Hari yang terlewat (scheduler mati, data datang terlambat) ikut terisi
+     * sehingga setiap tanggal punya prediksi yang bisa dibandingkan dengan nilai aktual.
+     *
+     * @return Collection<int, IrForecastRun>
+     */
+    public function forecastPending(Gardu $gardu, int $days): Collection
+    {
+        $latest = BatteryDaily::query()->where('gardu_id', $gardu->id)->max('date');
+        if (! $latest) {
+            return collect();
+        }
+
+        $done = IrForecastRun::query()
+            ->where('gardu_id', $gardu->id)
+            ->where('status', '!=', 'failed')
+            ->pluck('anchor_date')
+            ->map(fn ($date) => Carbon::parse($date)->toDateString())
+            ->flip();
+
+        return BatteryDaily::query()
+            ->where('gardu_id', $gardu->id)
+            ->where('date', '>=', Carbon::parse($latest)->subDays(max(1, $days) - 1)->toDateString())
+            ->select('date')
+            ->distinct()
+            ->orderBy('date')
+            ->pluck('date')
+            ->map(fn ($date) => Carbon::parse($date)->toDateString())
+            ->reject(fn (string $date) => $done->has($date))
+            ->map(fn (string $date) => $this->forecastGardu($gardu, $date))
+            ->filter()
+            ->values();
+    }
+
+    /**
      * Forecast satu gardu dari hari lengkap terakhir, atau dari $asOf untuk replay historis.
      * Mengembalikan null jika anchor tersebut sudah diproses atau belum ada data.
      */
