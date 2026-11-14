@@ -163,7 +163,6 @@
                             <th>IR Aktual (m&#8486;)</th>
                             <th>Selisih (m&#8486;)</th>
                             <th>Error (%)</th>
-                            <th>Rentang 95%</th>
                             <th>Kualitas</th>
                         </tr>
                     </thead>
@@ -179,18 +178,11 @@
                                 <td>{{ number_format($row['r_anchor'], 3) }}</td>
                                 <td>{{ number_format($row['r_pred'], 4) }}</td>
                                 @if (is_null($row['r_actual']))
-                                    <td colspan="4"><span class="badge bg-light text-dark">Menunggu nilai aktual</span></td>
+                                    <td colspan="3"><span class="badge bg-light text-dark">Menunggu nilai aktual</span></td>
                                 @else
                                     <td>{{ number_format($row['r_actual'], 3) }}</td>
                                     <td>{{ sprintf('%+.4f', $row['error']) }}</td>
                                     <td>{{ $fmt($row['error_pct'], 2) }}</td>
-                                    <td>
-                                        @if (is_null($row['in_band']))
-                                            -
-                                        @else
-                                            <span class="badge {{ $row['in_band'] ? 'bg-success' : 'bg-warning text-dark' }}">{{ $row['in_band'] ? 'Di dalam' : 'Di luar' }}</span>
-                                        @endif
-                                    </td>
                                 @endif
                                 <td>
                                     @php [$label, $class] = $qualityText[$row['quality']] ?? [$row['quality'], 'bg-secondary']; @endphp
@@ -199,7 +191,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="13" class="text-center text-muted py-3">
+                                <td colspan="12" class="text-center text-muted py-3">
                                     Belum ada prediksi dengan tanggal target pada rentang ini.
                                 </td>
                             </tr>

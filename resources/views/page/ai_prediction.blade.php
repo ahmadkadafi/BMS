@@ -50,37 +50,45 @@
         <div class="card-body">
             <form method="GET" action="{{ $formUrl }}">
                 <div class="row g-3 align-items-end">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label fw-bold"><i class="fas fa-map-marker-alt text-primary mr-1"></i> Lokasi</label>
-                        <select name="gardu_id" class="form-select" onchange="this.form.submit()">
+                        <select name="gardu_id" class="form-select">
                             @foreach ($gardu as $g)
                                 <option value="{{ $g->id }}" {{ $selectedGardu?->id === $g->id ? 'selected' : '' }}>{{ $g->nama }}</option>
                             @endforeach
                         </select>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label fw-bold"><i class="fas fa-battery-half text-primary mr-1"></i> Sel</label>
-                        <select name="cell" class="form-select" onchange="this.form.submit()">
+                        <select name="cell" class="form-select">
                             <option value="">Rata-rata semua sel</option>
                             @foreach ($cells as $id => $label)
                                 <option value="{{ $id }}" {{ $selectedCell === $id ? 'selected' : '' }}>{{ $label }}</option>
                             @endforeach
                         </select>
                     </div>
-                    <div class="col-md-4">
-                        <label class="form-label fw-bold"><i class="fas fa-calendar-check text-primary mr-1"></i> Prediksi dari tanggal</label>
-                        <select name="anchor" class="form-select" onchange="this.form.submit()" {{ $anchors->isEmpty() ? 'disabled' : '' }}>
-                            @forelse ($anchors as $anchor)
-                                <option value="{{ $anchor }}" {{ $selectedAnchor === $anchor ? 'selected' : '' }}>{{ \Carbon\Carbon::parse($anchor)->format('d/m/Y') }}</option>
-                            @empty
-                                <option>Belum ada prediksi</option>
-                            @endforelse
-                        </select>
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold"><i class="fas fa-calendar-alt text-primary mr-1"></i> Tanggal mulai</label>
+                        <input type="date" name="from" id="filterFrom" value="{{ $fromDate }}" max="{{ $maxDate }}" class="form-control" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold"><i class="fas fa-calendar-check text-primary mr-1"></i> Tanggal selesai</label>
+                        <input type="date" name="to" id="filterTo" value="{{ $toDate }}" max="{{ $maxDate }}" class="form-control" required>
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-primary w-100"><i class="fas fa-filter"></i> Filter</button>
                     </div>
                 </div>
+                <small class="text-muted d-block mt-2">
+                    <i class="fas fa-info-circle mr-1"></i> Rentang tanggal prediksi (anchor) maksimal 2 bulan. Kartu ringkasan dan tabel per sel memakai prediksi dari anchor terakhir pada rentang.
+                </small>
             </form>
         </div>
     </div>
+
+    @if ($rangeNotice)
+        <div class="alert alert-warning"><i class="fas fa-exclamation-triangle mr-1"></i> {{ $rangeNotice }}</div>
+    @endif
 
     @if (! $isValidated)
         @php
@@ -136,12 +144,7 @@
                         <div class="ai-stat-label">Prediksi H+{{ $h }}{{ $summary[$h] ? ' ('.$summary[$h]['target'].')' : '' }}</div>
                         @if ($summary[$h])
                             <div class="ai-stat-value">{{ number_format($summary[$h]['r_pred'], 3) }} <small>m&#8486;</small></div>
-                            <div class="ai-stat-note">
-                                {{ sprintf('%+.3f', $summary[$h]['delta']) }} m&#8486;
-                                @if (! is_null($summary[$h]['band']))
-                                    &middot; &plusmn;{{ number_format($summary[$h]['band'], 3) }}
-                                @endif
-                            </div>
+                            <div class="ai-stat-note">{{ sprintf('%+.3f', $summary[$h]['delta']) }} m&#8486;</div>
                             @if (! is_null($backtest[$h] ?? null))
                                 <div class="ai-stat-note {{ $backtest[$h] > 0 ? 'text-success' : 'text-danger' }}">
                                     Skill backtest {{ sprintf('%+.1f', $backtest[$h]) }}%
@@ -188,15 +191,17 @@
             <span class="fw-bold"><i class="fas fa-brain text-primary mr-1"></i> Forecast Internal Resistance</span>
             <small class="text-muted">
                 {{ $selectedGardu?->nama ?? '-' }} | {{ $selectedCell ? $cells[$selectedCell] : 'Rata-rata semua sel' }}
-                @if ($selectedAnchor) | hari anchor {{ \Carbon\Carbon::parse($selectedAnchor)->format('d/m/Y') }} @endif
+                | anchor {{ \Carbon\Carbon::parse($fromDate)->format('d/m/Y') }} s/d {{ \Carbon\Carbon::parse($toDate)->format('d/m/Y') }}
+                @if ($selectedAnchor) | anchor terakhir {{ \Carbon\Carbon::parse($selectedAnchor)->format('d/m/Y') }} @endif
             </small>
         </div>
         <div class="card-body">
             @if ($hasForecast)
                 <div class="ai-chart-box"><canvas id="aiChart"></canvas></div>
+                <small class="text-muted">Garis prediksi digambar pada tanggal target, dari semua anchor di dalam rentang.</small>
             @else
                 <div class="text-center text-muted py-5">
-                    Belum ada prediksi untuk gardu ini. Jalankan <code>php artisan ai:forecast</code> setelah riwayat harian mencukupi.
+                    Belum ada prediksi untuk gardu ini pada rentang tanggal yang dipilih. Jalankan <code>php artisan ai:forecast</code> setelah riwayat harian mencukupi.
                 </div>
             @endif
         </div>
@@ -277,6 +282,7 @@
 @endsection
 
 @section('adding')
+@include('partials.date-range-limit', ['maxDays' => \App\Http\Controllers\AiPredictionController::FORECAST_MAX_DAYS])
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
@@ -285,18 +291,20 @@ const aiStatusUrl = @json($statusUrl);
 let aiVersion = @json($lastRun?->id);
 
 if (aiChart.labels.length) {
-    const hasBand = aiChart.high.some(value => value !== null);
+    const horizonColors = ['#dc3545', '#fd7e14', '#0d6efd', '#6f42c1'];
     const datasets = [
         { label: 'Aktual', data: aiChart.actual, borderColor: '#212529', backgroundColor: '#212529', borderWidth: 2, pointRadius: 0, spanGaps: true },
-        { label: 'Prediksi', data: aiChart.forecast, borderColor: '#dc3545', backgroundColor: '#dc3545', borderWidth: 2, borderDash: [6, 4], pointRadius: 4, spanGaps: true },
+        ...Object.entries(aiChart.forecast).map(([horizon, data], index) => ({
+            label: 'Prediksi H+' + horizon,
+            data,
+            borderColor: horizonColors[index % horizonColors.length],
+            backgroundColor: horizonColors[index % horizonColors.length],
+            borderWidth: 2,
+            borderDash: [6, 4],
+            pointRadius: 3,
+            spanGaps: true,
+        })),
     ];
-
-    if (hasBand) {
-        datasets.push(
-            { label: 'Batas bawah 95%', data: aiChart.low, borderColor: 'transparent', pointRadius: 0, spanGaps: true, fill: false },
-            { label: 'Rentang 95%', data: aiChart.high, borderColor: 'transparent', backgroundColor: 'rgba(220, 53, 69, 0.15)', pointRadius: 0, spanGaps: true, fill: '-1' }
-        );
-    }
 
     new Chart(document.getElementById('aiChart'), {
         type: 'line',
@@ -305,9 +313,6 @@ if (aiChart.labels.length) {
             responsive: true,
             maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
-            plugins: {
-                legend: { labels: { filter: item => item.text !== 'Batas bawah 95%' } },
-            },
             scales: {
                 x: { ticks: { maxTicksLimit: 12 } },
                 y: { title: { display: true, text: 'Internal resistance (mΩ)' } },

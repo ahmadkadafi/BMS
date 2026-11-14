@@ -58,7 +58,7 @@ Prediksi tetap disimpan, tetapi ditandai pada kolom `quality`:
 - `ir_frozen`: IR tidak berubah 7 hari atau lebih (maksimum di data latih 6 hari).
 - `ood`: |z| input melebihi 12 (maksimum di data test 10,4).
 
-Rentang ±1,96 × RMSE test hanya ditampilkan untuk Cilejit.
+Rentang ±1,96 × RMSE test (Cilejit) tetap disimpan di `r_low`/`r_high`, tetapi tidak ditampilkan di halaman.
 
 ## Riwayat dan replay
 

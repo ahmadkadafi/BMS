@@ -261,7 +261,39 @@ class AiPredictionTest extends TestCase
         $response->assertOk()->assertDownload('tabulasi-prediksi-ir-cilejit-20260501_20260510.csv');
         $csv = $response->streamedContent();
         $this->assertStringContainsString('IR Prediksi (mOhm)', $csv);
-        $this->assertStringContainsString('03/05/2026,H+1,"Sel 1",LSTM_h1,4.5,4.52,4.6,-0.08,1.74,Tidak,ok', $csv);
+        $this->assertStringContainsString('03/05/2026,H+1,"Sel 1",LSTM_h1,4.5,4.52,4.6,-0.08,1.74,ok', $csv);
+        $this->assertStringNotContainsString('Rentang', $csv);
+    }
+
+    public function test_forecast_page_uses_latest_anchor_in_date_range(): void
+    {
+        $this->seedGardu();
+        DB::table('ir_forecast')->insert(['gardu_id' => 1] + $this->forecastRow(1));
+        DB::table('ir_forecast')->insert(['gardu_id' => 1] + $this->forecastRow(1, 'ok', [
+            'anchor_date' => '2026-05-10', 'target_date' => '2026-05-11', 'r_pred' => 4.61,
+        ]));
+
+        $this->asAdmin()->get('/ai-prediction?gardu_id=1')
+            ->assertOk()
+            ->assertViewHas('selectedAnchor', '2026-05-10')
+            ->assertViewHas('fromDate', '2026-03-10')
+            ->assertSee('4.610')
+            ->assertDontSee('Rentang 95%')
+            ->assertViewHas('chart', fn ($chart) => in_array(4.52, $chart['forecast'][1], true) && in_array(4.61, $chart['forecast'][1], true));
+
+        $this->asAdmin()->get('/ai-prediction?gardu_id=1&from=2026-05-01&to=2026-05-05')
+            ->assertViewHas('selectedAnchor', '2026-05-02')
+            ->assertSee('4.520');
+    }
+
+    public function test_forecast_page_limits_range_to_two_months(): void
+    {
+        $this->seedGardu();
+
+        $this->asAdmin()->get('/ai-prediction?gardu_id=1&from=2026-01-01&to=2026-05-31')
+            ->assertOk()
+            ->assertViewHas('fromDate', '2026-03-31')
+            ->assertSee('Rentang tanggal maksimal 62 hari');
     }
 
     public function test_status_endpoint_reports_latest_run_version(): void

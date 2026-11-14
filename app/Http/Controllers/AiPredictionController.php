@@ -19,7 +19,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AiPredictionController extends Controller
 {
-    private const HISTORY_DAYS = 60;
+    // Rentang tanggal anchor pada halaman forecast, cukup untuk dua bulan kalender penuh
+    public const FORECAST_MAX_DAYS = 62;
 
     public const TABULATION_MAX_DAYS = 31;
 
@@ -31,25 +32,33 @@ class AiPredictionController extends Controller
         $selectedGardu = $this->selectedGardu($request, $gardu);
         $horizons = config('ai.horizons');
 
-        $anchors = collect();
         $selectedAnchor = null;
         $cells = collect();
         $forecasts = collect();
         $lastRun = null;
 
-        if ($selectedGardu) {
-            $anchors = IrForecast::query()
-                ->where('gardu_id', $selectedGardu->id)
-                ->select('anchor_date')
-                ->distinct()
-                ->orderByDesc('anchor_date')
-                ->limit(60)
-                ->pluck('anchor_date')
-                ->map(fn ($date) => $date->toDateString());
+        // Default: dua bulan sampai anchor terakhir gardu, agar prediksi lama tetap tampil
+        if (! $request->filled('from') && ! $request->filled('to')) {
+            $latestAnchor = $selectedGardu
+                ? IrForecast::query()->where('gardu_id', $selectedGardu->id)->max('anchor_date')
+                : null;
+            $to = $latestAnchor
+                ? Carbon::parse($latestAnchor, config('app.timezone'))
+                : now(config('app.timezone'))->startOfDay();
+            $request->merge([
+                'from' => $to->copy()->subDays(self::FORECAST_MAX_DAYS - 1)->toDateString(),
+                'to' => $to->toDateString(),
+            ]);
+        }
+        $range = DateRange::fromRequest($request, self::FORECAST_MAX_DAYS);
 
-            $selectedAnchor = in_array($request->input('anchor'), $anchors->all(), true)
-                ? $request->input('anchor')
-                : $anchors->first();
+        if ($selectedGardu) {
+            // Kartu ringkasan dan tabel per sel memakai anchor terakhir di dalam rentang
+            $selectedAnchor = IrForecast::query()
+                ->where('gardu_id', $selectedGardu->id)
+                ->whereBetween('anchor_date', [$range->fromDate(), $range->toDate()])
+                ->max('anchor_date');
+            $selectedAnchor = $selectedAnchor ? Carbon::parse($selectedAnchor)->toDateString() : null;
 
             $cells = $selectedGardu->batteries()->orderBy('id')->pluck('id')
                 ->mapWithKeys(fn ($id, $index) => [$id => 'Sel '.($index + 1)]);
@@ -75,8 +84,11 @@ class AiPredictionController extends Controller
             'isValidated' => in_array($selectedGardu?->kode, config('ai.validated_gardu'), true),
             'backtest' => $this->backtest($selectedGardu),
             'horizons' => $horizons,
-            'anchors' => $anchors,
             'selectedAnchor' => $selectedAnchor,
+            'fromDate' => $range->fromDate(),
+            'toDate' => $range->toDate(),
+            'maxDate' => DateRange::maxDate(),
+            'rangeNotice' => $range->notice,
             'cells' => $cells,
             'selectedCell' => $selectedCell,
             'setting' => $setting,
@@ -86,7 +98,7 @@ class AiPredictionController extends Controller
             'readiness' => $this->readiness($lastRun, $horizons),
             'rows' => $this->cellRows($cells, $forecasts, $horizons, $setting),
             'summary' => $this->horizonSummary($forecasts, $selectedCell, $horizons),
-            'chart' => $this->chartData($selectedGardu, $forecasts, $selectedAnchor, $selectedCell),
+            'chart' => $this->chartData($selectedGardu, $range, $selectedAnchor, $selectedCell, $horizons),
             'accuracy' => $selectedGardu ? $this->accuracy($selectedGardu, $horizons) : [],
             'statusUrl' => $resor
                 ? route('ai-prediction.resor.status', ['resor' => $resor->id, 'gardu_id' => $selectedGardu?->id])
@@ -173,7 +185,7 @@ class AiPredictionController extends Controller
             ->orderByDesc('f.target_date')
             ->orderBy('f.horizon')
             ->orderBy('f.battery_id')
-            ->select('f.battery_id', 'f.anchor_date', 'f.target_date', 'f.horizon', 'f.model', 'f.r_anchor', 'f.r_pred', 'f.r_low', 'f.r_high', 'f.quality', 'd.ir as r_actual');
+            ->select('f.battery_id', 'f.anchor_date', 'f.target_date', 'f.horizon', 'f.model', 'f.r_anchor', 'f.r_pred', 'f.quality', 'd.ir as r_actual');
     }
 
     private function tabulationRow(object $row, Collection $cells): array
@@ -193,7 +205,6 @@ class AiPredictionController extends Controller
             'r_actual' => $actual,
             'error' => $error,
             'error_pct' => is_null($error) || $actual == 0.0 ? null : abs($error) / $actual * 100,
-            'in_band' => is_null($actual) || is_null($row->r_low) ? null : $actual >= (float) $row->r_low && $actual <= (float) $row->r_high,
             'quality' => $row->quality,
         ];
     }
@@ -247,7 +258,7 @@ class AiPredictionController extends Controller
             fwrite($handle, "\xEF\xBB\xBF");
             fputcsv($handle, [
                 'No', 'Lokasi', 'Tanggal Anchor', 'Tanggal Target', 'Horizon', 'Sel', 'Model',
-                'IR Anchor (mOhm)', 'IR Prediksi (mOhm)', 'IR Aktual (mOhm)', 'Selisih (mOhm)', 'Error (%)', 'Dalam Rentang 95%', 'Kualitas',
+                'IR Anchor (mOhm)', 'IR Prediksi (mOhm)', 'IR Aktual (mOhm)', 'Selisih (mOhm)', 'Error (%)', 'Kualitas',
             ]);
 
             $number = 0;
@@ -267,7 +278,6 @@ class AiPredictionController extends Controller
                         $row['r_actual'] ?? '-',
                         is_null($row['error']) ? '-' : round($row['error'], 4),
                         is_null($row['error_pct']) ? '-' : round($row['error_pct'], 2),
-                        is_null($row['in_band']) ? '-' : ($row['in_band'] ? 'Ya' : 'Tidak'),
                         $row['quality'],
                     ]);
                 }
@@ -432,21 +442,22 @@ class AiPredictionController extends Controller
                 'model' => $items->first()->model,
                 'r_pred' => (float) $items->avg('r_pred'),
                 'delta' => (float) $items->avg('r_pred') - (float) $items->avg('r_anchor'),
-                'band' => is_null($items->first()->r_high)
-                    ? null
-                    : (float) $items->first()->r_high - (float) $items->first()->r_pred,
             ]];
         })->all();
     }
 
-    private function chartData(?Gardu $gardu, Collection $forecasts, ?string $anchor, ?int $cell): array
+    /**
+     * IR aktual harian dan prediksi per horizon menurut tanggal target, untuk semua anchor di
+     * dalam rentang. Sumbu waktu diperpanjang sampai target terjauh dari anchor terakhir.
+     */
+    private function chartData(?Gardu $gardu, DateRange $range, ?string $anchor, ?int $cell, array $horizons): array
     {
         if (! $gardu || ! $anchor) {
-            return ['labels' => [], 'actual' => [], 'forecast' => [], 'low' => [], 'high' => []];
+            return ['labels' => [], 'actual' => [], 'forecast' => []];
         }
 
-        $start = Carbon::parse($anchor)->subDays(self::HISTORY_DAYS);
-        $end = Carbon::parse($anchor)->addDays(max(config('ai.horizons')));
+        $start = $range->from->copy();
+        $end = Carbon::parse($anchor)->addDays(max($horizons));
 
         $actual = BatteryDaily::query()
             ->where('gardu_id', $gardu->id)
@@ -455,30 +466,30 @@ class AiPredictionController extends Controller
             ->selectRaw('date, AVG(ir) as ir')
             ->groupBy('date')
             ->get()
-            ->mapWithKeys(fn ($row) => [$row->date->toDateString() => round((float) $row->ir, 4)]);
+            ->mapWithKeys(fn ($row) => [Carbon::parse($row->date)->toDateString() => round((float) $row->ir, 4)]);
 
-        $scoped = ($cell ? $forecasts->where('battery_id', $cell) : $forecasts)->groupBy('horizon');
-        $points = $scoped->mapWithKeys(fn (Collection $items) => [
-            $items->first()->target_date->toDateString() => [
-                'pred' => round((float) $items->avg('r_pred'), 4),
-                'low' => is_null($items->first()->r_low) ? null : round((float) $items->avg('r_low'), 4),
-                'high' => is_null($items->first()->r_high) ? null : round((float) $items->avg('r_high'), 4),
-            ],
-        ]);
+        $predicted = DB::table('ir_forecast')
+            ->where('gardu_id', $gardu->id)
+            ->when($cell, fn ($q) => $q->where('battery_id', $cell))
+            ->whereBetween('anchor_date', [$range->fromDate(), $range->toDate()])
+            ->selectRaw('horizon, target_date, AVG(r_pred) as r_pred')
+            ->groupBy('horizon', 'target_date')
+            ->get()
+            ->groupBy('horizon')
+            ->map(fn (Collection $items) => $items->mapWithKeys(fn ($row) => [
+                Carbon::parse($row->target_date)->toDateString() => round((float) $row->r_pred, 4),
+            ]));
 
         $labels = [];
-        $series = ['actual' => [], 'forecast' => [], 'low' => [], 'high' => []];
-        $anchorValue = $actual[$anchor] ?? null;
+        $series = ['actual' => [], 'forecast' => array_fill_keys($horizons, [])];
 
         for ($day = $start->copy(); $day->lte($end); $day->addDay()) {
             $date = $day->toDateString();
             $labels[] = $day->format('d/m/y');
             $series['actual'][] = $actual[$date] ?? null;
-            $point = $points[$date] ?? null;
-            $seed = $date === $anchor && $points->isNotEmpty() ? $anchorValue : null;
-            $series['forecast'][] = $point['pred'] ?? $seed;
-            $series['low'][] = $point['low'] ?? ($points->first()['low'] ?? null ? $seed : null);
-            $series['high'][] = $point['high'] ?? ($points->first()['high'] ?? null ? $seed : null);
+            foreach ($horizons as $h) {
+                $series['forecast'][$h][] = $predicted[$h][$date] ?? null;
+            }
         }
 
         return ['labels' => $labels] + $series;
