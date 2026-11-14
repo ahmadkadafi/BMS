@@ -6,6 +6,7 @@ use App\Models\BatteryDaily;
 use App\Models\Gardu;
 use App\Models\IrForecast;
 use App\Models\IrForecastRun;
+use App\Support\SensorRange;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -47,7 +48,8 @@ class IrForecastService
         $from = $day->copy()->startOfDay()->toDateTimeString();
         $to = $day->copy()->endOfDay()->toDateTimeString();
 
-        $means = DB::table('battery_monitoring as m')
+        // Sampel dengan nilai sensor di luar rentang wajar tidak ikut dihitung
+        $means = SensorRange::whereValid(DB::table('battery_monitoring as m'), 'battery', ['volt' => 'm.volt', 'temp' => 'm.temp', 'thd' => 'm.thd'])
             ->join('battery as b', 'b.id', '=', 'm.battery_id')
             ->whereBetween('m.measured_at', [$from, $to])
             ->groupBy('m.battery_id', 'b.gardu_id')
@@ -60,7 +62,7 @@ class IrForecastService
 
         $lastIr = DB::query()
             ->fromSub(
-                DB::table('battery_monitoring')
+                SensorRange::whereValid(DB::table('battery_monitoring'), 'battery', ['volt' => 'volt', 'temp' => 'temp', 'thd' => 'thd'])
                     ->whereBetween('measured_at', [$from, $to])
                     ->selectRaw('battery_id, thd, ROW_NUMBER() OVER (PARTITION BY battery_id ORDER BY measured_at DESC, id DESC) as rn'),
                 'ranked'
@@ -68,7 +70,7 @@ class IrForecastService
             ->where('rn', 1)
             ->pluck('thd', 'battery_id');
 
-        $chargers = DB::table('charger_monitoring as m')
+        $chargers = SensorRange::whereValid(DB::table('charger_monitoring as m'), 'charger', ['voltage' => 'm.voltage', 'current' => 'm.current'])
             ->join('charger as c', 'c.id', '=', 'm.charger_id')
             ->whereBetween('m.measured_at', [$from, $to])
             ->groupBy('c.gardu_id')

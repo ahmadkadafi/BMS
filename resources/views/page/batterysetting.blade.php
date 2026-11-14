@@ -4,8 +4,10 @@
 
 @section('content')
 <div class="page-inner">
-
-    
+    @if (session('success'))
+        <div class="alert alert-success">{{ session('success') }}</div>
+    @endif
+    @include('partials.setting-errors')
 
     {{-- ================= TABLE ================= --}}
     <div class="card">

@@ -7,6 +7,7 @@ use App\Models\Gardu;
 use App\Models\IrForecast;
 use App\Models\IrForecastRun;
 use App\Models\Resor;
+use App\Services\AlarmEtaService;
 use App\Support\DateRange;
 use Carbon\Carbon;
 use Illuminate\Database\Query\Builder;
@@ -399,12 +400,25 @@ class AiPredictionController extends Controller
             $items = ($byCell[$batteryId] ?? collect())->keyBy('horizon');
             $last = $items->sortBy('horizon')->last();
 
+            $first = $items->first();
+            $reliable = $first && $items->every(fn ($f) => $f->quality === 'ok');
+            $eta = collect(['warning' => $setting?->thd_warn, 'alarm' => $setting?->thd_alarm])
+                ->filter(fn ($limit) => $reliable && ! is_null($limit))
+                ->map(fn ($limit) => app(AlarmEtaService::class)->forecastCrossing(
+                    Carbon::parse($first->anchor_date),
+                    (float) $first->r_anchor,
+                    $items->values(),
+                    (float) $limit
+                ))
+                ->all();
+
             return [
                 'label' => $label,
-                'r_anchor' => $items->first()?->r_anchor,
+                'r_anchor' => $first?->r_anchor,
                 'predictions' => collect($horizons)->mapWithKeys(fn ($h) => [$h => $items[$h] ?? null])->all(),
                 'status' => $this->thresholdStatus($last?->r_pred, $setting),
                 'quality' => $last?->quality,
+                'eta' => $eta,
             ];
         })->values()->all();
     }

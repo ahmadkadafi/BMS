@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Charger;
 use App\Models\ChargerSetting;
 use App\Models\Resor;
+use App\Support\ThresholdRules;
 use Illuminate\Http\Request;
 
 class ChargerSettingController extends Controller
@@ -24,31 +25,29 @@ class ChargerSettingController extends Controller
 
     public function store(Request $request)
     {
-        $request->validate([
+        $value = 'nullable|numeric|between:0,9999.99';
+        $data = ThresholdRules::validate($request, [
             'charger_id' => 'required|exists:charger,id',
-            'float' => 'nullable|numeric',
-            'boost' => 'nullable|numeric',
-            'warn_min_volt' => 'nullable|numeric',
-            'warn_max_volt' => 'nullable|numeric',
-            'alarm_min_volt' => 'nullable|numeric',
-            'alarm_max_volt' => 'nullable|numeric',
-            'warn_curr' => 'nullable|numeric',
-            'alarm_curr' => 'nullable|numeric',
+            'float' => $value,
+            'boost' => $value,
+            'warn_min_volt' => $value,
+            'warn_max_volt' => $value,
+            'alarm_min_volt' => $value,
+            'alarm_max_volt' => $value,
+            'warn_curr' => $value,
+            'alarm_curr' => $value,
+        ], [
+            ['warn_min_volt', 'alarm_min_volt', 'Voltage min', 'min'],
+            ['warn_max_volt', 'alarm_max_volt', 'Voltage max', 'max'],
+            ['warn_curr', 'alarm_curr', 'Current', 'max'],
+        ], [
+            ['warn_min_volt', 'warn_max_volt', 'Voltage warning'],
+            ['alarm_min_volt', 'alarm_max_volt', 'Voltage alarm'],
         ]);
 
         ChargerSetting::updateOrCreate(
-            ['charger_id' => $request->charger_id],
-            $request->only([
-                'charger_id',
-                'float',
-                'boost',
-                'warn_min_volt',
-                'warn_max_volt',
-                'alarm_min_volt',
-                'alarm_max_volt',
-                'warn_curr',
-                'alarm_curr',
-            ])
+            ['charger_id' => $data['charger_id']],
+            $data
         );
 
         return back()->with('success', 'Charger setting berhasil disimpan');

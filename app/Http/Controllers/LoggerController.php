@@ -5,12 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\Logger;
 use App\Models\Resor;
 use App\Models\Gardu;
+use App\Services\AlarmEtaService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class LoggerController extends Controller
 {
-    public function index(Request $request, ?Resor $resor = null)
+    public function index(Request $request, AlarmEtaService $eta, ?Resor $resor = null)
     {
         $garduOptions = Gardu::query()
             ->when($resor, fn ($q) => $q->where('resor_id', $resor->id))
@@ -28,8 +29,10 @@ class LoggerController extends Controller
             ->with([
                 'resor:id,nama',
                 'gardu:id,nama',
+                'gardu.batterySetting',
                 'battery:id,serial_no',
                 'charger:id,merk,serial_no',
+                'charger.chargerSetting',
             ])
             ->orderByDesc('occurred_at')
             ->paginate(15)
@@ -39,6 +42,7 @@ class LoggerController extends Controller
             'resor' => $resor,
             'garduOptions' => $garduOptions,
             'logs' => $logs,
+            'etas' => $logs->getCollection()->mapWithKeys(fn (Logger $log) => [$log->id => $eta->forLog($log)]),
         ]);
     }
 

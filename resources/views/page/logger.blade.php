@@ -71,6 +71,7 @@
                             <option value="">-- Semua Type --</option>
                             <option value="warning" {{ request('alarm_type') === 'warning' ? 'selected' : '' }}>Warning</option>
                             <option value="alarm" {{ request('alarm_type') === 'alarm' ? 'selected' : '' }}>Alarm</option>
+                            <option value="sensor_fault" {{ request('alarm_type') === 'sensor_fault' ? 'selected' : '' }}>Sensor Fault</option>
                         </select>
                     </div>
 
@@ -115,6 +116,7 @@
                             <th>Duration</th>
                             <th>Alarm Type</th>
                             <th>Message</th>
+                            <th>Estimasi</th>
                             <th>Action</th>
                         </tr>
                     </thead>
@@ -132,7 +134,11 @@
                                     'confirm' => 'bg-info text-dark',
                                     default => 'bg-secondary',
                                 };
-                                $alarmBadge = $alarmType === 'alarm' ? 'bg-danger' : 'bg-warning text-dark';
+                                $alarmBadge = match ($alarmType) {
+                                    'alarm' => 'bg-danger',
+                                    'sensor_fault' => 'bg-dark',
+                                    default => 'bg-warning text-dark',
+                                };
                             @endphp
                             <tr>
                                 <td class="text-center">{{ $logs->firstItem() + $loop->index }}</td>
@@ -140,6 +146,14 @@
                                 <td class="text-nowrap">{{ $log->occurred_at?->format('H:i:s') }}</td>
                                 <td class="text-nowrap">
                                     <span class="badge {{ $statusBadge }}">{{ strtoupper($lifecycleStatus) }}</span>
+                                    @if ($log->alarm_code)
+                                        <br>
+                                        @if ($log->isOngoing())
+                                            <span class="badge bg-danger mt-1">AKTIF</span>
+                                        @else
+                                            <span class="badge bg-success mt-1" title="Pulih {{ $log->cleared_at->format('d/m/Y H:i:s') }}">PULIH</span>
+                                        @endif
+                                    @endif
                                 </td>
                                 <td class="text-center">{{ ucfirst($log->device_type) }}</td>
                                 <td class="text-center">
@@ -154,13 +168,33 @@
                                         -
                                     @endif
                                 </td>
-                                <td class="text-center">{{ $log->duration_text ?? '-' }}</td>
+                                <td class="text-center text-nowrap">
+                                    {{ $log->duration_text ?? '-' }}
+                                    @if ($log->isOngoing())
+                                        <br><small class="text-muted">berlangsung</small>
+                                    @endif
+                                    @if ($log->response_text)
+                                        <br><small class="text-muted" title="Waktu sampai dikonfirmasi">respons {{ $log->response_text }}</small>
+                                    @endif
+                                </td>
                                 <td class="text-center">
                                     <span class="badge {{ $alarmBadge }}">
-                                        {{ strtoupper($alarmType) }}
+                                        {{ $alarmType === 'sensor_fault' ? 'SENSOR FAULT' : strtoupper($alarmType) }}
                                     </span>
                                 </td>
-                                <td class="logger-message">{{ $log->message }}</td>
+                                <td class="logger-message">
+                                    {{ $log->message }}
+                                    @if (! is_null($log->peak_value))
+                                        <br><small class="text-muted">Puncak {{ rtrim(rtrim(number_format($log->peak_value, 3, '.', ''), '0'), '.') }}@if ($log->escalated_at && $log->escalated_at->ne($log->occurred_at)), naik ke alarm {{ $log->escalated_at->format('d/m/Y H:i') }}@endif</small>
+                                    @endif
+                                </td>
+                                <td class="text-center small">
+                                    @if ($etas[$log->id] ?? null)
+                                        @include('partials.eta', ['eta' => $etas[$log->id], 'target' => 'Alarm'])
+                                    @else
+                                        -
+                                    @endif
+                                </td>
                                 <td class="text-center">
                                     @if ($lifecycleStatus === 'open')
                                         <div class="d-flex justify-content-center gap-1">
@@ -199,7 +233,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="10" class="text-center text-muted py-4">
+                                <td colspan="12" class="text-center text-muted py-4">
                                     Tidak ada data warning/alarm berdasarkan battery setting.
                                 </td>
                             </tr>

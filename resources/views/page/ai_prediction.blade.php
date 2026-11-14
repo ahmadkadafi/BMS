@@ -223,6 +223,8 @@
                                     <th>H+{{ $h }}</th>
                                 @endforeach
                                 <th>Status horizon terjauh</th>
+                                <th>Estimasi Warning</th>
+                                <th>Estimasi Alarm</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -242,6 +244,15 @@
                                             <span class="text-muted">{{ $row['status'] }}</span>
                                         @endif
                                     </td>
+                                    @foreach (['warning' => 'Warning', 'alarm' => 'Alarm'] as $level => $target)
+                                        <td class="small">
+                                            @if (isset($row['eta'][$level]))
+                                                @include('partials.eta', ['eta' => $row['eta'][$level], 'target' => $target])
+                                            @else
+                                                <span class="text-muted">-</span>
+                                            @endif
+                                        </td>
+                                    @endforeach
                                 </tr>
                             @endforeach
                         </tbody>

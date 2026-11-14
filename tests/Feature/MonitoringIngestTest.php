@@ -14,7 +14,8 @@ class MonitoringIngestTest extends TestCase
     {
         parent::setUp();
 
-        config(['services.ingest.token' => 'secret-token']);
+        // Debounce dimatikan di sini; siklus debounce/pulih diuji di AlarmLifecycleTest
+        config(['services.ingest.token' => 'secret-token', 'alarm.debounce_samples' => 1]);
 
         DB::table('daop')->insert(['id' => 1, 'nama' => 'Test', 'wilayah' => 'Test']);
         DB::table('resor')->insert(['id' => 1, 'nama' => 'Resor 1', 'alamat' => 'Test', 'n_asset' => 1, 'daop_id' => 1]);

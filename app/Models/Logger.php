@@ -20,6 +20,10 @@ class Logger extends Model
         'status',
         'alarm_type',
         'alarm_code',
+        'last_value',
+        'peak_value',
+        'escalated_at',
+        'cleared_at',
         'lifecycle_status',
         'confirmed_at',
         'closed_at',
@@ -28,6 +32,8 @@ class Logger extends Model
 
     protected $casts = [
         'occurred_at' => 'datetime',
+        'escalated_at' => 'datetime',
+        'cleared_at' => 'datetime',
         'confirmed_at' => 'datetime',
         'closed_at' => 'datetime',
     ];
@@ -52,13 +58,41 @@ class Logger extends Model
         return $this->belongsTo(Charger::class, 'charger_id');
     }
 
+    /**
+     * Lama gangguan: dari kejadian sampai nilai pulih, atau sampai sekarang jika masih berlangsung.
+     * Log non-threshold tanpa siklus pulih memakai waktu close operator.
+     */
     public function getDurationTextAttribute(): ?string
     {
-        if (! $this->occurred_at || ! $this->closed_at) {
+        if (! $this->occurred_at) {
             return null;
         }
 
-        $seconds = (int) abs($this->occurred_at->diffInSeconds($this->closed_at));
+        $end = $this->cleared_at ?? ($this->alarm_code ? now() : $this->closed_at);
+        if (! $end) {
+            return null;
+        }
+
+        return $this->formatDuration((int) abs($this->occurred_at->diffInSeconds($end)));
+    }
+
+    // Waktu respons operator: dari kejadian sampai confirm
+    public function getResponseTextAttribute(): ?string
+    {
+        if (! $this->occurred_at || ! $this->confirmed_at) {
+            return null;
+        }
+
+        return $this->formatDuration((int) abs($this->occurred_at->diffInSeconds($this->confirmed_at)));
+    }
+
+    public function isOngoing(): bool
+    {
+        return $this->alarm_code && ! $this->cleared_at;
+    }
+
+    private function formatDuration(int $seconds): string
+    {
         $days = intdiv($seconds, 86400);
         $seconds %= 86400;
         $hours = intdiv($seconds, 3600);

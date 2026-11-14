@@ -7,6 +7,7 @@
     @if (session('success'))
         <div class="alert alert-success">{{ session('success') }}</div>
     @endif
+    @include('partials.setting-errors')
 
     <div class="card">
         <div class="card-header">
