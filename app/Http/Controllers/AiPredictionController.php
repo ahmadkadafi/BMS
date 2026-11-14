@@ -22,7 +22,7 @@ class AiPredictionController extends Controller
     // Rentang tanggal anchor pada halaman forecast, cukup untuk dua bulan kalender penuh
     public const FORECAST_MAX_DAYS = 62;
 
-    public const TABULATION_MAX_DAYS = 31;
+    public const TABULATION_MAX_DAYS = 45;
 
     private const TABULATION_PER_PAGE = 50;
 
