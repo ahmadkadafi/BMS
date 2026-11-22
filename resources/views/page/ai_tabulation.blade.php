@@ -175,12 +175,12 @@
                                 <td>H+{{ $row['horizon'] }}</td>
                                 <td>{{ $row['cell'] }}</td>
                                 <td>{{ $row['model'] }}</td>
-                                <td>{{ number_format($row['r_anchor'], 3) }}</td>
-                                <td>{{ number_format($row['r_pred'], 4) }}</td>
+                                <td>{{ number_format($row['r_anchor'], 2) }}</td>
+                                <td>{{ number_format($row['r_pred'], 2) }}</td>
                                 @if (is_null($row['r_actual']))
                                     <td colspan="3"><span class="badge bg-light text-dark">Menunggu nilai aktual</span></td>
                                 @else
-                                    <td>{{ number_format($row['r_actual'], 3) }}</td>
+                                    <td>{{ number_format($row['r_actual'], 2) }}</td>
                                     <td>{{ sprintf('%+.4f', $row['error']) }}</td>
                                     <td>{{ $fmt($row['error_pct'], 2) }}</td>
                                 @endif

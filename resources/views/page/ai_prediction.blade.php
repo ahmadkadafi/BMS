@@ -143,7 +143,7 @@
                     <div class="card-body">
                         <div class="ai-stat-label">Prediksi H+{{ $h }}{{ $summary[$h] ? ' ('.$summary[$h]['target'].')' : '' }}</div>
                         @if ($summary[$h])
-                            <div class="ai-stat-value">{{ number_format($summary[$h]['r_pred'], 3) }} <small>m&#8486;</small></div>
+                            <div class="ai-stat-value">{{ number_format($summary[$h]['r_pred'], 2) }} <small>m&#8486;</small></div>
                             <div class="ai-stat-note">{{ sprintf('%+.3f', $summary[$h]['delta']) }} m&#8486;</div>
                             @if (! is_null($backtest[$h] ?? null))
                                 <div class="ai-stat-note {{ $backtest[$h] > 0 ? 'text-success' : 'text-danger' }}">
@@ -231,9 +231,9 @@
                             @foreach ($rows as $row)
                                 <tr>
                                     <td>{{ $row['label'] }}</td>
-                                    <td>{{ $row['r_anchor'] ?? '-' }}</td>
+                                    <td>{{ is_null($row['r_anchor']) ? '-' : number_format($row['r_anchor'], 2) }}</td>
                                     @foreach ($horizons as $h)
-                                        <td>{{ $row['predictions'][$h] ? number_format($row['predictions'][$h]->r_pred, 3) : '-' }}</td>
+                                        <td>{{ $row['predictions'][$h] ? number_format($row['predictions'][$h]->r_pred, 2) : '-' }}</td>
                                     @endforeach
                                     <td>
                                         @if (in_array($row['quality'], ['ir_frozen', 'ood'], true))
@@ -332,6 +332,13 @@ if (aiChart.labels.length) {
             responsive: true,
             maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: ctx => ctx.parsed.y === null ? null : `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)} mΩ`,
+                    },
+                },
+            },
             scales: {
                 x: { ticks: { maxTicksLimit: 12 } },
                 y: { max: yMax, title: { display: true, text: 'Internal resistance (mΩ)' } },
