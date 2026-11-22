@@ -272,4 +272,5 @@ Schedule::command('report:rollup')
 // Sekali sehari setelah hari kemarin lengkap; hari yang terlewat ikut dilengkapi
 Schedule::command('ai:forecast')
     ->dailyAt(config('ai.schedule_at'))
-    ->withoutOverlapping();
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/ai-forecast.log'));
