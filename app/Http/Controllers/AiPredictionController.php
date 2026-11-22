@@ -300,8 +300,8 @@ class AiPredictionController extends Controller
 
     private function selectedGardu(Request $request, Collection $gardu): ?Gardu
     {
+        // Tampilan awal (tanpa gardu_id) ke gardu dengan ID terkecil (ID 1).
         return $gardu->firstWhere('id', (int) $request->input('gardu_id'))
-            ?? $gardu->first(fn (Gardu $g) => in_array($g->kode, config('ai.validated_gardu'), true))
             ?? $gardu->first();
     }
 

@@ -317,6 +317,14 @@ if (aiChart.labels.length) {
         })),
     ];
 
+    // Sumbu Y max dibulatkan ke atas ke kelipatan 10 (IR < 10 -> 10, 10-20 -> 20, dst.)
+    const allValues = datasets
+        .flatMap(ds => ds.data)
+        .map(Number)
+        .filter(v => v !== null && Number.isFinite(v));
+    const peakValue = allValues.length ? Math.max(...allValues) : 0;
+    const yMax = Math.max(10, Math.ceil(peakValue / 10) * 10);
+
     new Chart(document.getElementById('aiChart'), {
         type: 'line',
         data: { labels: aiChart.labels, datasets },
@@ -326,7 +334,7 @@ if (aiChart.labels.length) {
             interaction: { mode: 'index', intersect: false },
             scales: {
                 x: { ticks: { maxTicksLimit: 12 } },
-                y: { title: { display: true, text: 'Internal resistance (mΩ)' } },
+                y: { max: yMax, title: { display: true, text: 'Internal resistance (mΩ)' } },
             },
         },
     });
